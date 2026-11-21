@@ -1,0 +1,9 @@
+<idea-plugin>
+  <extensions defaultExtensionNs="com.intellij.spring">
+    <customLocalComponentsDiscoverer implementation="dev.mybatis.assistant.ide.spring.SpringMapperDiscoverer"/>
+    <componentScanExtender implementation="dev.mybatis.assistant.ide.spring.SpringMapperScanExtender"/>
+  </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <localInspection language="JAVA" shortName="MyBatisAssistantMapperScan" displayName="MapperScan 配置检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.MapperScanInspection"/>
+  </extensions>
+</idea-plugin>

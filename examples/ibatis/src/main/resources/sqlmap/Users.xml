@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sqlMap PUBLIC "-//ibatis.apache.org//DTD SQL Map 2.0//EN" "http://ibatis.apache.org/dtd/sql-map-2.dtd">
+<sqlMap namespace="legacy.Users">
+  <typeAlias alias="User" type="example.legacy.User"/>
+  <resultMap id="UserResult" class="User">
+    <result column="id" property="id"/>
+    <result column="name" property="name"/>
+  </resultMap>
+  <sql id="Columns">id, name</sql>
+  <select id="load" parameterClass="java.lang.Long" resultMap="UserResult">
+    SELECT <include refid="Columns"/> FROM users WHERE id = #id#
+  </select>
+  <select id="search" parameterClass="User" resultMap="UserResult">
+    SELECT <include refid="Columns"/> FROM users
+    <dynamic prepend="WHERE">
+      <isNotEmpty property="name">name = #name:VARCHAR#</isNotEmpty>
+    </dynamic>
+  </select>
+  <select id="findByIds" parameterClass="map" resultMap="UserResult">
+    SELECT <include refid="Columns"/> FROM users WHERE
+    <isNotEmpty property="ids">
+      id IN <iterate property="ids" open="(" close=")" conjunction=",">#ids[]#</iterate>
+    </isNotEmpty>
+    <isEmpty property="ids">1 = 0</isEmpty>
+  </select>
+</sqlMap>

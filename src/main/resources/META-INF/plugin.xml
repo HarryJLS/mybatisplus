@@ -1,0 +1,68 @@
+<idea-plugin require-restart="true">
+  <id>dev.mybatis.assistant</id>
+  <name>MyBatis Assistant (Rust)</name>
+  <version>0.5.0</version>
+  <vendor>MyBatis Assistant Contributors</vendor>
+  <description><![CDATA[
+    Independent MyBatis development assistant with a lazy Rust parsing engine.
+    Mapper/XML navigation, binding completion and inspections, DDL-to-CRUD generation,
+    method-name query generation, SQL log restoration and dynamic SQL preview.
+    iBATIS 2 sqlMap navigation, legacy parameter completion and SQL client statement references.
+    Offline iBATIS 2 dynamic SQL evaluation with conditional tags, prepend rules and iterate.
+    持久 namespace 索引，按需计算，后台生成，无轮询或常驻外部进程。
+  ]]></description>
+  <idea-version since-build="261" until-build="261.*"/>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.java</depends>
+  <depends>com.intellij.modules.xml</depends>
+  <depends optional="true" config-file="plugin-database.xml">com.intellij.database</depends>
+  <depends optional="true" config-file="plugin-kotlin.xml">org.jetbrains.kotlin</depends>
+  <depends optional="true" config-file="plugin-spring.xml">com.intellij.spring</depends>
+  <extensionPoints>
+    <extensionPoint qualifiedName="dev.mybatis.assistant.databaseProvider" interface="dev.mybatis.assistant.ide.DatabaseProvider" dynamic="true"/>
+    <extensionPoint qualifiedName="dev.mybatis.assistant.languageSupport" interface="dev.mybatis.assistant.ide.MapperLanguageSupport" dynamic="true"/>
+  </extensionPoints>
+  <extensions defaultExtensionNs="org.jetbrains.kotlin">
+    <supportsKotlinPluginMode supportsK2="true" supportsK1="false"/>
+  </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <fileBasedIndex implementation="dev.mybatis.assistant.ide.MapperNamespaceIndex"/>
+    <fileBasedIndex implementation="dev.mybatis.assistant.ide.TypeAliasIndex"/>
+    <projectService serviceImplementation="dev.mybatis.assistant.ide.AssistantSettings"/>
+    <projectService serviceImplementation="dev.mybatis.assistant.ide.McpProjectService"/>
+    <httpRequestHandler implementation="dev.mybatis.assistant.ide.McpHttpHandler"/>
+    <projectConfigurable instance="dev.mybatis.assistant.ide.AssistantConfigurable" id="dev.mybatis.assistant.settings" displayName="MyBatis Assistant" parentId="tools"/>
+    <psi.referenceContributor language="XML" implementation="dev.mybatis.assistant.ide.MapperReferences"/>
+    <psi.referenceContributor language="JAVA" implementation="dev.mybatis.assistant.ide.SqlApiReferences"/>
+    <psi.referenceContributor language="JAVA" implementation="dev.mybatis.assistant.ide.AnnotationReferences"/>
+    <completion.contributor language="JAVA" implementationClass="dev.mybatis.assistant.ide.AnnotationCompletion"/>
+    <renameHandler implementation="dev.mybatis.assistant.ide.ParamRenameHandler"/>
+    <renameHandler implementation="dev.mybatis.assistant.ide.MappingIdRenameHandler"/>
+    <renameHandler implementation="dev.mybatis.assistant.ide.ScopedVariableRenameHandler"/>
+    <gotoDeclarationHandler implementation="dev.mybatis.assistant.ide.PlaceholderGotoDeclaration"/>
+    <referencesSearch implementation="dev.mybatis.assistant.ide.PlaceholderReferenceSearch"/>
+    <consoleFilterProvider implementation="dev.mybatis.assistant.ide.SqlConsoleFilterProvider"/>
+    <completion.contributor language="XML" implementationClass="dev.mybatis.assistant.ide.MapperCompletion"/>
+    <codeInsight.lineMarkerProvider language="JAVA" implementationClass="dev.mybatis.assistant.ide.MapperGutter"/>
+    <codeInsight.lineMarkerProvider language="XML" implementationClass="dev.mybatis.assistant.ide.MapperGutter"/>
+    <localInspection language="XML" shortName="MyBatisAssistantXml" displayName="MyBatis 映射与参数检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.MapperInspection"/>
+    <localInspection language="JAVA" shortName="MyBatisAssistantMethod" displayName="Mapper 方法缺少 SQL" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.MapperMethodInspection"/>
+    <localInspection language="JAVA" shortName="MyBatisAssistantAnnotation" displayName="MyBatis 注解 SQL 参数检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.AnnotationInspection"/>
+    <intentionAction><className>dev.mybatis.assistant.ide.GenerateStatementIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
+    <intentionAction><className>dev.mybatis.assistant.ide.WrapIfIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
+    <toolWindow id="MyBatis Assistant" anchor="right" factoryClass="dev.mybatis.assistant.ide.AssistantToolWindow" icon="/icons/assistant.svg"/>
+  </extensions>
+  <actions>
+    <group id="MyBatisAssistant.Tools" text="MyBatis Assistant" popup="true">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+      <action id="MyBatisAssistant.Open" class="dev.mybatis.assistant.ide.OpenAssistantAction" text="生成 CRUD…"/>
+      <action id="MyBatisAssistant.LogSql" class="dev.mybatis.assistant.ide.LogSqlAction" text="日志转 SQL…"/>
+      <action id="MyBatisAssistant.PreviewSql" class="dev.mybatis.assistant.ide.PreviewSqlAction" text="动态 SQL 预览…"/>
+      <action id="MyBatisAssistant.MethodQuery" class="dev.mybatis.assistant.ide.MethodQueryAction" text="根据方法名生成 SQL…"/>
+      <action id="MyBatisAssistant.EntityDdl" class="dev.mybatis.assistant.ide.EntityDdlAction" text="从实体生成建表语句…"/>
+      <action id="MyBatisAssistant.LegacyNavigate" class="dev.mybatis.assistant.ide.LegacyNavigateAction" text="从 DAO 接口查找 iBATIS XML…"/>
+      <action id="MyBatisAssistant.DatabaseExecute" class="dev.mybatis.assistant.ide.DatabaseExecuteAction" text="数据库执行…"/>
+      <action id="MyBatisAssistant.McpConnection" class="dev.mybatis.assistant.ide.McpConnectionAction" text="MCP 客户端连接配置…"/>
+    </group>
+  </actions>
+</idea-plugin>

@@ -1,0 +1,734 @@
+{
+  "referencePluginId": "com.ccnode.codegenerator.MyBatisCodeHelperPro",
+  "referenceVersion": "3.6.9+2321",
+  "mainJar": "instrumented-MyBatisCodeHelper-Pro241-3.6.9+2321.jar",
+  "classCount": 1928,
+  "resourceCount": 130,
+  "libraryCount": 32,
+  "libraryBytes": 30815257,
+  "resourcePaths": [
+    "META-INF/MANIFEST.MF",
+    "META-INF/MyBatisCodeHelper-Pro241.kotlin_module",
+    "bin/mybatis-agent.jar",
+    "generator.properties",
+    "i18n/i18n.properties",
+    "i18n/i18n_zh_CN.properties",
+    "icon/back-arrow-blue.png",
+    "icon/back-arrow-blue@2x.png",
+    "icon/back-arrow-red.png",
+    "icon/back-arrow-red@2x.png",
+    "icon/col.png",
+    "icon/col@2x.png",
+    "icon/copy.png",
+    "icon/copy@2x.png",
+    "icon/copy@2x_dark.png",
+    "icon/copy_dark.png",
+    "icon/left-arrow.png",
+    "icon/left-arrow@2x.png",
+    "icon/mybatis_java.png",
+    "icon/mybatis_java.svg",
+    "icon/mybatis_java@2x.png",
+    "icon/mybatis_small.png",
+    "icon/mybatis_small.svg",
+    "icon/mybatis_small@2x.png",
+    "icon/mybatis_small_dark.svg",
+    "icon/mybatis_xml.png",
+    "icon/mybatis_xml.svg",
+    "icon/mybatis_xml@2x.png",
+    "icon/right-arrow.png",
+    "icon/right-arrow@2x.png",
+    "icon/sendToTheLeftGrayed.png",
+    "icon/sendToTheLeftGrayed@2x.png",
+    "icon/sendToTheLeftGrayed@2x_dark.png",
+    "icon/sendToTheLeftGrayed_dark.png",
+    "icon/sendToTheRightGrayed.png",
+    "icon/sendToTheRightGrayed@2x.png",
+    "icon/sendToTheRightGrayed@2x_dark.png",
+    "icon/sendToTheRightGrayed_dark.png",
+    "icondd/add.png",
+    "icondd/add@2x.png",
+    "icondd/addaa@2x_dark.png",
+    "icondd/addaa_dark.png",
+    "icondd/addNew.png",
+    "icondd/addNew@2x.png",
+    "icondd/delete.png",
+    "icondd/delete@2x.png",
+    "icondd/passwordLock.png",
+    "icondd/passwordLock@2x.png",
+    "icondd/toolConsole.png",
+    "icondd/toolConsole@2x.png",
+    "icondd/toolConsole@2x_dark.png",
+    "icondd/toolConsole_dark.png",
+    "icons/action_small.svg",
+    "icons/batsLog.svg",
+    "icons/batsLog@2x.svg",
+    "icons/batsLog@2x_dark.svg",
+    "icons/batsLogCopy.svg",
+    "icons/batsLog_dark.svg",
+    "icons/beauty.svg",
+    "icons/beta.svg",
+    "inspectionDescriptions/MapperDomElement.html",
+    "intentionDescriptions/GeneratePropertiesBaseOnResultMapAction/description.html",
+    "jdbc_config.json",
+    "liveTemplates/mybatisCommentTemplates.xml",
+    "liveTemplates/mybatisCommonTemplates.xml",
+    "liveTemplates/mybatisSqlNavigatorTemplates.xml",
+    "liveTemplates/mybatisSqlTemplates.xml",
+    "liveTemplates/ognl-struts2.xml",
+    "liveTemplates/ognl.xml",
+    "log4j.properties",
+    "mcp/skill/en/references/pitfalls.md",
+    "mcp/skill/en/references/tools.md",
+    "mcp/skill/en/SKILL.md",
+    "mcp/skill/zh/references/pitfalls.md",
+    "mcp/skill/zh/references/tools.md",
+    "mcp/skill/zh/SKILL.md",
+    "META-INF/batsPlugin.xml",
+    "META-INF/kotlin_database.xml",
+    "META-INF/ognl.xml",
+    "META-INF/plugin.xml",
+    "META-INF/pluginIcon.svg",
+    "META-INF/plugin_database.xml",
+    "META-INF/plugin_databaseNavigator.xml",
+    "META-INF/plugin_spring.xml",
+    "META-INF/plugin_springboot.xml",
+    "META-INF/velocity.xml",
+    "META-INF/withKotlin.xml",
+    "META-INF/withYaml.xml",
+    "ognlExample.txt",
+    "string.properties",
+    "templates/gencode/dao.ftl",
+    "templates/gencode/mapperxml.ftl",
+    "templates/gencode/service.ftl",
+    "templates/gencode/service_interface.ftl",
+    "templates/genMapper.ftl",
+    "templates/genTestCase/mybatisConfig.ftl",
+    "templates/genTestCase/setUpMethod.ftl",
+    "templates/genTestCase/setUpMethod_Junit5.ftl",
+    "templates/genTestCase/testClass.ftl",
+    "templates/genTestCase/testClass_JUnit5.ftl",
+    "templates/insert.ftl",
+    "templates/insertList.ftl",
+    "templates/insert_without_test.ftl",
+    "templates/javaClassWithGetterAndSetter.ftl",
+    "templates/mybatisGenerator/mybatisflex_service.ftl",
+    "templates/mybatisGenerator/mybatisflex_service.vm",
+    "templates/mybatisGenerator/mybatisflex_serviceInterface.ftl",
+    "templates/mybatisGenerator/mybatisflex_serviceInterface.vm",
+    "templates/mybatisGenerator/mybatisplus_service.ftl",
+    "templates/mybatisGenerator/mybatisplus_service.vm",
+    "templates/mybatisGenerator/mybatisplus_serviceInterface.ftl",
+    "templates/mybatisGenerator/mybatisplus_serviceInterface.vm",
+    "templates/mybatisGenerator/service.ftl",
+    "templates/mybatisGenerator/service.vm",
+    "templates/mybatisGenerator/serviceInterface.ftl",
+    "templates/mybatisGenerator/serviceInterface.vm",
+    "templates/mybatisGenerator.ftl",
+    "templates/myController.vm",
+    "templates/myControllerRuoyiStyle.vm",
+    "templates/myControllerUseBeanAsResultAndService.vm",
+    "templates/myControllerUseBeanAsResultAndServiceInterface.vm",
+    "templates/myControllerUseServceInterface.vm",
+    "templates/myController_moremethod.vm",
+    "templates/newclass.ftl",
+    "templates/page/pageQuery.ftl",
+    "templates/ResultBean.java.vm",
+    "templates/updateByPrimaryKey.ftl",
+    "templates/updateSelective.ftl",
+    "text/BatsLogBundle.properties",
+    "text/BatsLogBundle_zh.properties"
+  ],
+  "descriptors": {
+    "META-INF/batsPlugin.xml": {
+      "extensionCount": 0,
+      "parseNote": "no element found: line 55, column 0"
+    },
+    "META-INF/kotlin_database.xml": {
+      "extensionCount": 0,
+      "extensionTypes": {},
+      "inspectionNames": [],
+      "actionCount": 0
+    },
+    "META-INF/ognl.xml": {
+      "extensionCount": 0,
+      "extensionTypes": {},
+      "inspectionNames": [],
+      "actionCount": 0
+    },
+    "META-INF/plugin.xml": {
+      "extensionCount": 110,
+      "extensionTypes": {
+        "supportsKotlinPluginMode": 1,
+        "modificationTracker": 2,
+        "errorHandler": 1,
+        "codeInsight.lineMarkerProvider": 5,
+        "psi.referenceContributor": 3,
+        "completion.contributor": 7,
+        "typedHandler": 2,
+        "weigher": 1,
+        "iconProvider": 1,
+        "localInspection": 10,
+        "applicationConfigurable": 3,
+        "projectConfigurable": 1,
+        "notificationGroup": 1,
+        "definitionsSearch": 1,
+        "toolWindow": 2,
+        "renameHandler": 1,
+        "referencesSearch": 1,
+        "fileBasedIndex": 1,
+        "intentionAction": 16,
+        "projectService": 11,
+        "dom.fileMetaData": 2,
+        "lang.parserDefinition": 2,
+        "fileTypeFactory": 1,
+        "lang.foldingBuilder": 1,
+        "lang.formatter": 1,
+        "lang.braceMatcher": 2,
+        "lang.elementManipulator": 1,
+        "quoteHandler": 1,
+        "colorSettingsPage": 2,
+        "liveTemplateContext": 3,
+        "defaultLiveTemplatesProvider": 2,
+        "spellchecker.support": 2,
+        "multiHostInjector": 3,
+        "mybatisognl.variableReferencesContributor": 1,
+        "backspaceHandlerDelegate": 1,
+        "lang.syntaxHighlighterFactory": 1,
+        "refactoring.elementListenerProvider": 1,
+        "daemon.changeLocalityDetector": 1,
+        "postStartupActivity": 3,
+        "lang.inspectionSuppressor": 1,
+        "runLineMarkerContributor": 2,
+        "databaseConfigProvider": 1,
+        "consoleFilterProvider": 1,
+        "runConfigurationExtension": 1,
+        "applicationService": 2
+      },
+      "inspectionNames": [
+        "unUsedXml",
+        "unUsedMethod",
+        "methodNotInXmlInspection",
+        "MybatisResultTypeCheck",
+        "ResultMapColumnCheck",
+        "ResultMapColumnDuplicateCheck",
+        "Mapper xml inspection",
+        "OgnlCompareStringCheck",
+        "OgnlReferenceCheck",
+        "ParamInspection"
+      ],
+      "actionCount": 27
+    },
+    "META-INF/plugin_database.xml": {
+      "extensionCount": 25,
+      "extensionTypes": {
+        "completion.contributor": 2,
+        "localInspection": 1,
+        "weigher": 1,
+        "applicationConfigurable": 1,
+        "psi.referenceContributor": 1,
+        "lang.formatter": 1,
+        "postStartupActivity": 1,
+        "multiHostInjector": 3,
+        "defaultLiveTemplatesProvider": 1,
+        "multiLangCommenter": 1,
+        "intentionAction": 5,
+        "liveTemplateContext": 1,
+        "referencesSearch": 1,
+        "enterHandlerDelegate": 1,
+        "database.parameterPatternProvider": 1,
+        "schemaSyncSourceProvider": 1,
+        "databaseConfigProvider": 1,
+        "ultimateVersionChecker": 1
+      },
+      "inspectionNames": [
+        "checkSelectColumnExistInMybatisResultmap"
+      ],
+      "actionCount": 11
+    },
+    "META-INF/plugin_databaseNavigator.xml": {
+      "extensionCount": 4,
+      "extensionTypes": {
+        "multiHostInjector": 1,
+        "liveTemplateContext": 1,
+        "defaultLiveTemplatesProvider": 1,
+        "databaseToolChecker": 1
+      },
+      "inspectionNames": [],
+      "actionCount": 2
+    },
+    "META-INF/plugin_spring.xml": {
+      "extensionCount": 4,
+      "extensionTypes": {
+        "customLocalComponentsDiscoverer": 1,
+        "componentScanExtender": 1,
+        "psi.referenceContributor": 1,
+        "localInspection": 1
+      },
+      "inspectionNames": [
+        "MapperScan"
+      ],
+      "actionCount": 0
+    },
+    "META-INF/plugin_springboot.xml": {
+      "extensionCount": 1,
+      "extensionTypes": {
+        "mybatisTypeAliasProvider": 1
+      },
+      "inspectionNames": [],
+      "actionCount": 0
+    },
+    "META-INF/velocity.xml": {
+      "extensionCount": 1,
+      "extensionTypes": {
+        "controllerEditorProvider": 1
+      },
+      "inspectionNames": [],
+      "actionCount": 0
+    },
+    "META-INF/withKotlin.xml": {
+      "extensionCount": 8,
+      "extensionTypes": {
+        "modificationTracker": 1,
+        "kotlinChecker": 1,
+        "intentionAction": 4,
+        "multiHostInjector": 1,
+        "completion.contributor": 1
+      },
+      "inspectionNames": [],
+      "actionCount": 0
+    },
+    "META-INF/withYaml.xml": {
+      "extensionCount": 0,
+      "extensionTypes": {},
+      "inspectionNames": [],
+      "actionCount": 0
+    }
+  },
+  "templateVariables": {
+    "templates/gencode/dao.ftl": [
+      "daoPackageName",
+      "daoType",
+      "pojoFullType",
+      "pojoName",
+      "pojoType"
+    ],
+    "templates/gencode/mapperxml.ftl": [
+      "daoFullType",
+      "fieldAndColumn.column",
+      "fieldAndColumn.field",
+      "fieldAndColumn.formattedColumn",
+      "fieldAndColumn.jdbcType",
+      "keyColumn",
+      "pojoFullType",
+      "pojoName",
+      "primaryColumn",
+      "primaryField",
+      "primaryJdbcType",
+      "r\"#\"",
+      "tableName"
+    ],
+    "templates/gencode/service.ftl": [
+      "daoFullType",
+      "daoName",
+      "daoType",
+      "pojoFullType",
+      "pojoName",
+      "pojoType",
+      "serviceInterfaceFullType",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/gencode/service_interface.ftl": [
+      "pojoFullType",
+      "pojoName",
+      "pojoType",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/genMapper.ftl": [
+      "daoFullType"
+    ],
+    "templates/genTestCase/mybatisConfig.ftl": [
+      "jdbcDriver",
+      "mapperClass",
+      "password",
+      "testAdditionalConfig",
+      "typeAlias",
+      "url",
+      "userName",
+      "xmlFolder"
+    ],
+    "templates/genTestCase/setUpMethod.ftl": [
+      "configurationFolderName",
+      "driver",
+      "mapperClassFullName",
+      "password",
+      "testClassName",
+      "url",
+      "userName",
+      "xmlPath"
+    ],
+    "templates/genTestCase/setUpMethod_Junit5.ftl": [
+      "configurationFolderName",
+      "driver",
+      "mapperClassFullName",
+      "password",
+      "testClassName",
+      "url",
+      "userName",
+      "xmlPath"
+    ],
+    "templates/genTestCase/testClass.ftl": [
+      "methodInvocation",
+      "methodNameFirstUpper"
+    ],
+    "templates/genTestCase/testClass_JUnit5.ftl": [
+      "methodInvocation",
+      "methodNameFirstUpper"
+    ],
+    "templates/insert.ftl": [
+      "filedAndColumn.column",
+      "filedAndColumn.field",
+      "filedAndColumn.jdbcType",
+      "pojoName",
+      "r\"#\"",
+      "tableName"
+    ],
+    "templates/insertList.ftl": [
+      "collectionName",
+      "fieldAndColumn.column",
+      "fieldAndColumn.field",
+      "fieldAndColumn.jdbcType",
+      "itemName",
+      "r\"#\"",
+      "tableName"
+    ],
+    "templates/insert_without_test.ftl": [
+      "filedAndColumn.column",
+      "filedAndColumn.field",
+      "filedAndColumn.jdbcType",
+      "pojoName",
+      "r\"#\"",
+      "tableName"
+    ],
+    "templates/javaClassWithGetterAndSetter.ftl": [
+      "annotation",
+      "className",
+      "field.comment",
+      "field.getMethodName",
+      "field.propertyFullJavaType",
+      "field.propertyName",
+      "field.setMethodName",
+      "import",
+      "packageName"
+    ],
+    "templates/mybatisGenerator/mybatisflex_service.ftl": [
+      "daoType",
+      "entityName",
+      "fileHeader",
+      "import",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/mybatisflex_service.vm": [
+      "daoType",
+      "entityName",
+      "fileHeader",
+      "import",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/mybatisflex_serviceInterface.ftl": [
+      "entityName",
+      "import",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator/mybatisflex_serviceInterface.vm": [
+      "entityName",
+      "import",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator/mybatisplus_service.ftl": [
+      "daoType",
+      "entityName",
+      "fileHeader",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/mybatisplus_service.vm": [
+      "daoType",
+      "entityName",
+      "fileHeader",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/mybatisplus_serviceInterface.ftl": [
+      "entityName",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator/mybatisplus_serviceInterface.vm": [
+      "entityName",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator/service.ftl": [
+      "daoName",
+      "daoType",
+      "fileHeader",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/service.vm": [
+      "daoName",
+      "daoType",
+      "fileHeader",
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceFullName",
+      "serviceInterfaceName",
+      "servicePackage",
+      "serviceType"
+    ],
+    "templates/mybatisGenerator/serviceInterface.ftl": [
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator/serviceInterface.vm": [
+      "import",
+      "method.name",
+      "method.returnType.shortName",
+      "parameter.name",
+      "parameter.type.shortName",
+      "serviceInterfaceFileHeader",
+      "serviceInterfaceName",
+      "serviceInterfacePackageName"
+    ],
+    "templates/mybatisGenerator.ftl": [
+      "projectJavaFolder",
+      "projectResourceFolder"
+    ],
+    "templates/myController.vm": [],
+    "templates/myControllerRuoyiStyle.vm": [
+      "serviceFirstLower"
+    ],
+    "templates/myControllerUseBeanAsResultAndService.vm": [
+      "serviceFirstLower"
+    ],
+    "templates/myControllerUseBeanAsResultAndServiceInterface.vm": [
+      "serviceFirstLower"
+    ],
+    "templates/myControllerUseServceInterface.vm": [
+      "serviceFirstLower"
+    ],
+    "templates/myController_moremethod.vm": [
+      "serviceFirstLower"
+    ],
+    "templates/newclass.ftl": [
+      "className",
+      "classPackage",
+      "field.fieldName",
+      "field.fieldShortType",
+      "import"
+    ],
+    "templates/page/pageQuery.ftl": [],
+    "templates/ResultBean.java.vm": [],
+    "templates/updateByPrimaryKey.ftl": [
+      "filedAndColumn.column",
+      "filedAndColumn.field",
+      "filedAndColumn.jdbcType",
+      "pojoName",
+      "r\"#\"",
+      "tableName"
+    ],
+    "templates/updateSelective.ftl": [
+      "filedAndColumn.column",
+      "filedAndColumn.field",
+      "filedAndColumn.jdbcType",
+      "pojoName",
+      "r\"#\"",
+      "tableName"
+    ]
+  },
+  "libraries": [
+    {
+      "name": "annotations-13.0.jar",
+      "bytes": 17536
+    },
+    {
+      "name": "asm-7.0.jar",
+      "bytes": 113676
+    },
+    {
+      "name": "cloning-1.9.3.jar",
+      "bytes": 26375
+    },
+    {
+      "name": "commons-compiler-3.0.15.jar",
+      "bytes": 71618
+    },
+    {
+      "name": "commons-lang-2.6.jar",
+      "bytes": 284220
+    },
+    {
+      "name": "commons-lang3-3.5.jar",
+      "bytes": 479881
+    },
+    {
+      "name": "druid-1.2.8.jar",
+      "bytes": 3702020
+    },
+    {
+      "name": "fastjson-1.2.79.jar",
+      "bytes": 671755
+    },
+    {
+      "name": "format-preserving-encryption-1.0.0.jar",
+      "bytes": 29881
+    },
+    {
+      "name": "freemarker-2.3.23.jar",
+      "bytes": 1350624
+    },
+    {
+      "name": "instrumented-MyBatisCodeHelper-Pro241-3.6.9+2321.jar",
+      "bytes": 3396838
+    },
+    {
+      "name": "janino-3.0.15.jar",
+      "bytes": 926494
+    },
+    {
+      "name": "javassist-3.29.0-GA.jar",
+      "bytes": 794034
+    },
+    {
+      "name": "jsqlparser-2.0.jar",
+      "bytes": 453427
+    },
+    {
+      "name": "kotlin-reflect-1.9.0.jar",
+      "bytes": 3223171
+    },
+    {
+      "name": "kotlin-stdlib-1.9.0.jar",
+      "bytes": 1708006
+    },
+    {
+      "name": "kotlin-stdlib-common-1.9.0.jar",
+      "bytes": 225141
+    },
+    {
+      "name": "mapper-generator-1.0.0.jar",
+      "bytes": 29938
+    },
+    {
+      "name": "mybatis-generator-core-1.4.0-SNAPSHOT.jar",
+      "bytes": 559353
+    },
+    {
+      "name": "mysql-connector-java-8.0.11.jar",
+      "bytes": 2036609
+    },
+    {
+      "name": "objenesis-2.1.jar",
+      "bytes": 41755
+    },
+    {
+      "name": "ognl-3.3.3.jar",
+      "bytes": 264819
+    },
+    {
+      "name": "okhttp-3.6.0.jar",
+      "bytes": 352320
+    },
+    {
+      "name": "okio-1.11.0.jar",
+      "bytes": 79429
+    },
+    {
+      "name": "oracleJDBC.jar",
+      "bytes": 2111338
+    },
+    {
+      "name": "postgresql-42.5.0.jar",
+      "bytes": 1046274
+    },
+    {
+      "name": "protobuf-java-2.6.0.jar",
+      "bytes": 596435
+    },
+    {
+      "name": "searchableOptions-3.6.9+2321.jar",
+      "bytes": 7193
+    },
+    {
+      "name": "slf4j-api-1.7.25.jar",
+      "bytes": 41203
+    },
+    {
+      "name": "slf4j-simple-1.7.25.jar",
+      "bytes": 15257
+    },
+    {
+      "name": "sqliteJDBC.jar",
+      "bytes": 5575351
+    },
+    {
+      "name": "sqlserverJDBC.jar",
+      "bytes": 583286
+    }
+  ]
+}

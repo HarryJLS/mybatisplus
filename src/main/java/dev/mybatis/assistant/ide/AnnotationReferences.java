@@ -1,0 +1,14 @@
+package dev.mybatis.assistant.ide;
+
+import com.intellij.patterns.PlatformPatterns;
+import com.intellij.psi.*;
+import com.intellij.util.ProcessingContext;
+import org.jetbrains.annotations.NotNull;
+
+public final class AnnotationReferences extends PsiReferenceContributor {
+    @Override public void registerReferenceProviders(@NotNull PsiReferenceRegistrar registrar){
+        registrar.registerReferenceProvider(PlatformPatterns.psiElement(PsiLiteralExpression.class),new PsiReferenceProvider(){
+            @Override public PsiReference @NotNull [] getReferencesByElement(@NotNull PsiElement element,@NotNull ProcessingContext context){return AnnotationSql.references((PsiLiteralExpression)element);}
+        });
+    }
+}

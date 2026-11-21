@@ -1,0 +1,12 @@
+.gradle/
+.intellijPlatform/
+.idea/
+*.iml
+build/
+native/target/
+.DS_Store
+examples/demo/target/
+examples/ibatis/target/
+MyBatisCodeHelper-Pro/
+__pycache__/
+*.pyc

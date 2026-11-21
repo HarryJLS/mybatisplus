@@ -1,0 +1,171 @@
+# MyBatis Assistant（Rust）
+
+独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前版本 **0.5.0**。
+
+Java 接入 IDEA 的语法树、索引和界面；Rust JNI 按需处理 DDL 与日志；SQL 预览根据 XML 根元素分派到 MyBatis 引擎或独立 iBATIS 求值器。原生库在第一次使用文本工具时加载，不创建常驻外部进程。
+
+支持 **IDEA 2026.1（261.*）、Java 21+**。自动构建提供 macOS Apple Silicon / Intel、Linux x86_64、Windows x86_64 安装包；原生库按平台分别打包。项目架构和协作要求见 [AGENTS.md](AGENTS.md)。
+
+## 安装与入口
+
+IDEA → Settings → Plugins → 齿轮 → Install Plugin from Disk，选择：
+
+[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。Apple Silicon 选择 `mybatis-assistant-0.5.0-macos-aarch64.zip`；Intel Mac、Linux 和 Windows 选择对应平台的 ZIP。
+
+本地构建包位于 `build/distributions/`。Release 中的 `SHA256SUMS-平台.txt` 与 `verification-平台.json` 提供完整性校验和归档检查结果。
+
+重启后从 Tools → MyBatis Assistant 打开工具。对比体验时可暂时禁用原插件，避免显示两套提示。
+
+## 当前功能
+
+| 功能 | 说明 |
+| --- | --- |
+| 接口 / XML 导航 | MyBatis mapper、iBATIS sqlMap；namespace 全名、唯一简称、显式映射、无 namespace 文件名 |
+| iBATIS DAO 导航 | 用户点击后查找实现、同类辅助方法、静态 SQL id 和常量拼接 |
+| SQL API 引用 | SqlMapClient、Spring SqlMapClientTemplate、SqlSession 的完整语句字符串 |
+| 参数与映射补全 | @Param、集合、索引、嵌套属性；resultMap、refid；旧 #property# / $property$ 与动态 property |
+| 基础检查 | 重复 id、缺失 MyBatis 方法/语句、无效引用/属性/参数；iBATIS 不套用 MyBatis 代理约束 |
+| 类型别名 | 内置别名、配置 XML、常量 properties/YAML 包名、包内 @Alias；模块范围索引查询，歧义不自动选类 |
+| OGNL 编辑 | 真实语法解析、已知属性/方法数量检查、零参数方法补全、String 与单字符比较提示；编辑检查不求值 |
+| resultMap 列检查 | 静态 SELECT 字段/别名、include 展开、重复列、内联嵌套 columnPrefix；动态投影与通配符跳过缺失列判断 |
+| 参数和映射重构 | @Param 绑定名、sql/resultMap/parameterMap id、foreach item/index、bind name；保持 namespace 前缀与局部作用域 |
+| 注解 SQL | 常量 SQL 的参数补全、跳转、检查和重构；常量数组及 script 注解可离线预览，Provider 不求值 |
+| SQL 编辑 | XML/注解的基础关键字补全；安装 IDEA Database 时为静态 SQL 注入 SQL 语言，使用平台提示与格式化 |
+| 控制台日志 | 可开启 Parameters 行的还原链接，按线程配对；点击才解析，不自动执行 SQL |
+| 数据库执行 | 独立 JDBC 入口：查询、事务回滚试跑、预览后确认提交；参数化单语句、结果和超时上限 |
+| 数据源与表结构 | 手动 JDBC 或可选 IDEA Database 的常规连接配置；读取表、字段、主键，密码使用 PasswordSafe |
+| MCP | IDEA 内置 HTTP 服务上的 8 个工具，项目令牌和本机访问；默认关闭，数据库访问单独开启，不提供提交 |
+| Kotlin | 可选 K2 接入，Mapper/XML 导航、参数/属性解析、常量 SQL 注解预览、直接字符串 @Param 绑定重构 |
+| Spring | 可选 MapperScan/MapperScans Bean 识别、扫描配置检查；标准 Boot 自动配置中的 @Mapper 支持 |
+| 代码生成 | DDL → 实体/Mapper/XML（MyBatis / MyBatis-Plus）；方法名 → 简单查询；实体 → DDL；预览后创建文件，不覆盖已有文件 |
+| SQL 日志还原 | Preparing / Parameters 配对、转义、null、数值和线程交错检查 |
+| MyBatis SQL 预览 | 真实 MyBatis 3.5.19 处理 if、where、set、trim、choose、foreach、bind、include |
+| iBATIS SQL 预览 | 独立处理 dynamic、旧条件标签、prepend、removeFirstPrepend、iterate、include、内联参数与静态 parameterMap |
+
+预览显示预编译 SQL 和有序参数，**不连接数据库，也不代表业务 SQL 已验证**。数据库执行使用独立入口。离线 MyBatis 求值限定 JSON 和常用无副作用方法，拒绝 Java 静态成员、反射、构造器、自定义 TypeHandler 及无法受限展开的脚本；iBATIS 使用独立求值器。尚未完整覆盖原插件，完整 SQL/OGNL 类型语义、全部 Kotlin/Spring 配置和自定义代码模板仍有边界。详见 [功能范围](docs/features.md) 与 [运行接入说明](docs/runtime.md)。
+
+## 使用
+
+- **生成 CRUD**：粘贴单表 CREATE TABLE，选择包名、框架、方言和目标模块，先预览再写入。
+- **日志转 SQL**：粘贴同一线程、完整配对的 MyBatis 日志，点击还原。
+- **动态 SQL 预览**：保持 mapper / sqlMap 为当前编辑器，光标放在语句内，输入 JSON 后预览；也可填写语句 id。
+- **iBATIS 参数**：JSON 对象表示 Map，支持根数组、标量和 null。集合标签使用标准 #items[].property# 或 #[].property#。
+- **自定义 namespace**：Settings → Tools → MyBatis Assistant，每行填写 `接口全名=namespace`。
+- **类型别名**：自动读取配置 XML 与常量 `mybatis.type-aliases-package` / `mybatis-plus.type-aliases-package`；复杂配置可在设置中补充包名或 `别名=类全名`。
+- **重命名**：在 `@Param` 字面值、映射 id、foreach/bind 声明或对应 XML 引用上使用 IDEA Rename（Shift+F6）。Java 参数标识符仍使用普通 Java 重构，保留显式 @Param 绑定名。
+- **控制台还原**：在设置中开启控制台 SQL 链接，点击 `Parameters:` 行打开还原结果；没有线程标识且日志交错时跳过配对。
+- **SQL 注解预览**：光标放在带常量 @Select/@Insert/@Update/@Delete 的方法内，使用动态 SQL 预览；JSON 键与实际 MyBatis 参数绑定名一致。
+- **数据库执行**：在设置的“数据库 / MCP / Spring”页配置 JDBC，或使用已配置的 IDEA Database 数据源；Tools → MyBatis Assistant → 数据库执行，刷新数据源，先预览再选择查询/回滚/确认提交。
+- **MCP**：应用“启用此项目 MCP”设置，再从 Tools 菜单查看连接配置；分别提供 JSON 客户端与 Codex TOML。数据库读取和 DML 回滚试跑分别授权，服务不提供提交；重启后需重新复制项目令牌。
+- **Kotlin/Spring**：安装并启用对应 IDEA 扩展后自动接入；当前验证 K2。Spring 支持字面量 MapperScan/MapperScans，以及标准 MyBatis/MyBatis-Plus Boot 自动配置；动态配置和自定义工厂/命名器明确跳过。
+
+`examples/demo` 和 `examples/ibatis` 提供可导入的 Maven 示例。[iBATIS 说明](docs/ibatis.md) 记录导航规则、求值语义和限制。MyBatis 稳定参数绑定建议显式使用 @Param；iBATIS 使用旧参数对象规则。
+
+## 构建与验证
+
+需要 Cargo/Rust、Python 3、JDK 21+ 与本地 IDEA SDK。
+
+```sh
+python3 scripts/build.py --test --bench
+python3 scripts/test_legacy.py
+python3 scripts/test_ide.py
+python3 scripts/test_database.py
+python3 scripts/test_ide.py --integrations
+python3 scripts/verify_archive.py
+```
+
+本地构建不另下载 IDEA，也不启动 Gradle 常驻进程。`IDEA_HOME` / `--idea-home` 可指定 IDEA 路径；iBATIS 2 与 H2 依赖只用于测试，不进入发布包。可选集成代码在构建时需要 SDK 自带 Database/Kotlin/Spring 扩展，安装时仍为可选依赖。IDEA 测试使用隔离配置，H2 测试使用临时内存库，不连接用户数据库。
+
+标准 IntelliJ Platform Gradle 工程：
+
+```sh
+JAVA_HOME=/path/to/jdk21 ./gradlew --no-daemon buildPlugin
+JAVA_HOME=/path/to/jdk21 ./gradlew coreTest
+JAVA_HOME=/path/to/jdk21 ./gradlew runIde
+```
+
+### GitHub 自动构建
+
+源码仓库：[HarryJLS/mybatisplus](https://github.com/HarryJLS/mybatisplus)，主分支为 `main`。向 `main` 推送代码会触发 [Build and release plugin](https://github.com/HarryJLS/mybatisplus/actions/workflows/build-plugin.yml)；也可在 Actions 手动运行。Pull Request 执行测试和打包，成功发布只在 `main` 上进行。
+
+流水线下载固定 **IDEA 2026.1.4** SDK，使用 JDK 21、Rust stable，在四个平台运行 Rust 测试、Java/JNI/MyBatis 核心断言和归档/注册实现/原生库架构校验。构建成功后，Actions 的 Artifacts 保留安装包、SHA256 和报告 30 天；四个平台全部成功后，自动创建 Release `v插件版本-build.流水线编号` 并上传同一套附件。普通 push 不必修改版本或创建 tag；编号让同一插件版本的不同构建也能分别下载，失败的构建不会发布 Release。
+
+IDEA 界面集成测试、可选 Kotlin/Spring/Database 专测及 H2/iBATIS 运行时对照仍使用上面的本地命令。自动打包通过不代表已验证全部 IDE 操作或真实生产数据库。切换到其他平台时，需要重新编译对应原生库，不支持用单个平台包替代全部平台。
+
+本地默认使用已安装的 IDEA；需要下载 SDK 时使用 `./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin`。Windows 可用 `gradlew.bat`。发布任务使用本次流水线的 GitHub 临时令牌，无需设置个人令牌或 Marketplace 密钥。
+
+性能设计和样例数据见 [性能报告](docs/performance.md)。`MyBatisCodeHelper-Pro/` 为本地参考资源约定目录，不纳入源码上传或发布包，当前源码和构建不依赖它；结构分析见 [参考资源说明](docs/reference-analysis.md)。
+
+## 版本记录
+
+日期采用 Asia/Shanghai。0.1.0–0.5.0 的功能最初在本地开发，没有独立的历史 Git commit；2026-11-21 首次上传以当前完整源码快照建立 Git 历史。历史条目的“未提交”表示该历史版本没有独立提交，不据此虚构提交记录。
+
+### 0.5.0 — 首次源码发布与自动打包
+
+- **更新日期：2026-11-21；提交日期：2026-11-21。** 保持插件功能版本 0.5.0，本次新增源码仓库与构建发布流程，以当前源码快照首次提交。
+- 新增 `main` push、Pull Request 和手动构建；CI 下载固定 IDEA 2026.1.4 SDK，保留本地 SDK 构建，补充 Windows Gradle 启动入口。
+- 修正 Gradle `coreTest` 的 SDK 运行依赖，确保 namespace XML 测试能够加载 NanoXML；依赖仅用于测试，不额外打包 IDEA SDK。
+- 新增四平台独立安装包、SHA256、注册实现与原生库架构检查；成功构建在 Actions 提供附件，`main` 全部通过后创建唯一编号 Release。
+- 排除生成目录、Python 缓存及参考插件资源；生产包拒绝测试依赖，GitHub 发布使用任务级临时令牌。
+- 验证：本地 `scripts/build.py --test` 的 15 项 Rust 测试与 152 项核心断言通过；JDK 21 标准 Gradle `coreTest buildPlugin`、macOS Apple Silicon 安装包的 41 个注册实现/原生库架构/归档检查、CI 附件命名与校验文件生成通过。流水线配置通过 actionlint 检查。云端每次运行的四平台结果以对应 Actions 记录为准，未扩大为 IDE 界面或生产数据库验证。
+
+### 0.5.0
+
+- **更新日期：2026-11-21；提交日期：未提交。**
+- 新增独立数据库执行入口：参数化 SELECT/INSERT/UPDATE/DELETE，支持查询、事务回滚试跑和确认提交；直接 JDBC 连接完成后关闭，原离线预览入口保持不连接数据库。
+- 新增手动 JDBC 配置及可选 IDE Database 数据源读取；密码保存在 PasswordSafe。暂不接管已有控制台事务，不支持 IDE SSH、额外 SSL 配置、初始化脚本或自定义认证流程。
+- 新增数据库表/字段/主键元数据读取，指定精确数据源与 schema；同名表歧义报错。执行限制为单语句、最多 1000 行、256 列、256 KiB SQL/文本结果、10000 参数及 1–60 秒 JDBC 超时；WITH、DDL、CALL 等暂不执行。
+- 新增项目级 MCP：复用 IDEA 内置 HTTP 服务，提供 8 个非代码生成工具；Streamable HTTP JSON 响应、项目令牌、仅本机连接、Origin/Host 校验及最多 4 个并发请求。默认关闭，数据库访问及 DML 回滚试跑分别开启；MCP 不提供事务提交或代码生成。
+- 可选 Kotlin 接入通过平台轻量 Java 模型实现 Mapper/XML 导航、参数/属性解析、映射检查和常量 SQL 注解预览；suspend Mapper 明确不支持，字符串模板插值、完整 Kotlin 注解编辑与重构仍有边界。
+- 可选 Spring 接入提供字面量 MapperScan/MapperScans 解析、包/标记接口/注解过滤、Mapper Bean 识别及缺失包提示；使用定向索引与随 PSI 失效的指针缓存，动态占位符、默认包扫描和自定义命名/工厂跳过。
+- 增加离线渲染执行边界：JSON 嵌套/数值精度限制，OGNL 静态成员/反射/构造器/赋值/投影与自定义 javaType/typeHandler 拒绝求值；include 总展开和动态 SQL 保守上界在求值前检查，OUT/INOUT 参数只显示而不执行。
+- 修正 Spring Bean 名称参数顺序，避免多个 Mapper 被登记成相同名称；Boot 自动 Mapper 识别要求实际自动配置入口，并在存在显式 MapperScan 时退出自动补充。
+- 直接字符串 Kotlin @Param 重构在修改前验证源注解，支持导入别名，避免只修改 XML 后无法同步声明。suspend、复杂注解表达式和完整 Kotlin 语义重构未覆盖。
+- 验证：15 项 Rust 测试、56 项原核心断言、38 项独立 iBATIS 求值断言、24 项编辑核心断言、25 项运行/MCP 核心断言及 9 项离线边界断言通过；62 项 IDEA 集成测试（含真实内置 HTTP 请求）、8 项实际 Kotlin/Spring/Database 扩展专测、30 项真实 H2 JDBC/事务断言及 71 组真实 iBATIS SQL/参数对照通过。
+- 实际数据库验证仅使用临时 H2：查询、提交、回滚、失败/取消后不提交、行数/文本上限和表结构。未连接用户数据库，未验证生产 MySQL/PostgreSQL/Oracle、全部认证/驱动环境、业务断言或长期性能。
+- 标准 JDK 21 / Gradle `buildPlugin` 通过；安装包的 41 个主/可选扩展实现、原生库及归档完整性检查通过。当前 macOS Apple Silicon 安装包约 2.29 MiB，README 安装链接和受影响功能/运行/性能文档已同步。
+
+### 0.4.0
+
+- **更新日期：2026-11-17；提交日期：未提交。**
+- 根据官方 `3.6.9+2321` 与本地参考资源核对，补充非代码生成的编辑、检查、重构和调试能力；本次不扩展代码生成。
+- 新增持久类型别名配置索引，支持 MyBatis 内置别名、XML typeAliases、常量 properties/YAML 包配置、包内 @Alias 与显式设置；按模块范围解析，同名冲突不猜测。限定最多 128 个配置文件、256 个包和 4096 个类；通配包名、环境占位符、复杂 YAML 与自定义注册器未覆盖。
+- 新增有界 SELECT 输出列解析和 include 展开，支持 resultMap 列补全、重复/缺失列检查与内联 columnPrefix；含 `*`、动态列或无法确定输出名的表达式时不执行缺失列判断，不声称数据库语义验证。
+- 使用 MyBatis 内置 OGNL 解析器检查语法、已知参数/属性和方法参数数量，补全零参数方法，提示 String 与单字符比较；编辑期间不调用业务方法。动态 Map、bind 推导类型、方法返回值链、投影/lambda 上下文及完整重载类型推导仍有边界。
+- 支持 @Param 绑定名、sql/resultMap/parameterMap id、foreach item/index 与 bind name 重构，保持 Java 参数标识符、跨 namespace 引用前缀和嵌套局部变量；补充父 Mapper 泛型实参解析，跨文件声明以 SmartPsiElementPointer 保存。
+- 常量 SQL 注解支持参数补全、引用、检查和重构；常量数组/字符串拼接及 script 可离线预览。script 的编辑检查/参数和局部变量重构、Provider 求值和注解迁移未实现；script 方法及来自外部常量/拼接表达式的注解拒绝自动 @Param 重构，防止只改绑定声明或误改遮蔽变量。
+- 可选 IDEA Database 依赖提供静态 SQL 的平台语言注入，保留 Java/XML 转义与绑定占位符，跳过动态标签、组合注解和 `${}` 标识符；不读取数据源，不连接数据库。
+- 控制台增加按线程有界配对和 Parameters 还原链接，默认关闭，点击后后台还原；不增加工作线程、轮询或自动 SQL 执行。
+- 验证：15 项 Rust 测试、56 项原有核心断言、38 项独立 iBATIS 求值断言、24 项新增编辑核心断言、51 项 IDEA 集成测试及 71 组真实 iBATIS SQL/参数对照通过；安装包的 30 个主/可选扩展实现与原生库检查通过。数据库元数据/执行、真实 Spring/Kotlin 项目、完整 SQL 语言注入界面体验和长期性能未验证。
+- 标准 JDK 21 / Gradle `buildPlugin` 构建通过；同步插件/Gradle 版本及安装包地址，保留历史版本与原资源包。
+
+### 0.3.0
+
+- **更新日期：2026-11-16；提交日期：未提交。**
+- 新建 AGENTS.md，说明架构、目录职责、性能约束、验证方式；要求每次功能更新同步 README 的版本说明和提交日期。
+- 重整 README，补齐项目说明、安装、验证方法及 0.1.0 / 0.2.0 / 0.3.0 历史。
+- 新增独立 iBATIS 2 SQL 求值器，处理旧条件标签、首个 prepend 移除、嵌套 iterate、include 与有序参数绑定。
+- 支持旧 #property# / JDBC 后缀、$property$、nullValue、静态 parameterMap、OUT/INOUT 占位说明；selectKey 单独标记为跳过。
+- 保留旧占位符名称中的空格，不将 MyBatis 的自动修整规则套到 iBATIS；校验参数选项及 numericScale。
+- 同一预览窗口支持 mapper 和 sqlMap；增加展开深度、步骤、迭代、参数数量与输出上限，拒绝循环引用和未知标签。
+- 使用真实 iBATIS 2 XMLSqlSource / DynamicSql 对照关键语义；自定义 TypeHandler、业务对象构造、数据库执行及动态标签混用外置 parameterMap 不在本版离线求值范围。
+- 验证：15 项 Rust 测试、56 项现有核心断言、38 项独立 iBATIS 求值断言、71 组真实 iBATIS SQL/参数对照、26 项 IDEA 集成测试全部通过；标准 Gradle 构建、21 个扩展实现/原生库打包检查、MyBatis 与 iBATIS 示例编译通过。
+
+### 0.2.0
+
+- **更新日期：2026-11-15；提交日期：未提交。**
+- 新增 iBATIS sqlMap 识别及接口/方法双向跳转；支持全名、唯一简称、自定义 namespace 映射和无 namespace 文件匹配。
+- 新增按需 DAO 实现查找，识别静态 SQL id、常量拼接与同类辅助方法；新增 SQL API 字符串导航。
+- 兼容 parameterClass/resultClass、parameterMap/resultMap class、旧占位符、动态 property 和 iterate 元素类型。
+- 旧 DAO 不强制接口方法和 SQL id 同名，避免 MyBatis 代理规则误报。
+- 当时尚不支持旧动态 SQL 求值；该能力在 0.3.0 增加。
+- 验证：15 项 Rust 测试、56 项核心断言、25 项 IDEA 集成测试；标准构建、发布包检查及两个示例编译通过。
+
+### 0.1.0
+
+- **更新日期：2026-11-15；提交日期：未提交。**
+- 建立 Java + Rust JNI 插件工程，提供本地 SDK 构建与标准 Gradle 工程。
+- 实现 MyBatis namespace 索引、接口/XML 导航、参数与映射补全及基础检查。
+- 实现 DDL/CRUD、简单方法名查询、实体 DDL、SQL 骨架、if test 操作、日志还原和 MyBatis 动态 SQL 预览。
+- 增加随 PSI 失效的缓存、按方法共享绑定、Rust 延迟加载、生成预览和同名文件保护。
+- 增加原插件资源结构分析、性能样例与示例项目；该阶段是核心功能初版，不是原插件全部能力的复刻。
