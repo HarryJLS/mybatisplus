@@ -1,18 +1,18 @@
 # MyBatis Assistant（Rust）
 
-独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前版本 **0.5.0**。
+独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前版本 **0.5.1**。
 
 Java 接入 IDEA 的语法树、索引和界面；Rust JNI 按需处理 DDL 与日志；SQL 预览根据 XML 根元素分派到 MyBatis 引擎或独立 iBATIS 求值器。原生库在第一次使用文本工具时加载，不创建常驻外部进程。
 
-支持 **IDEA 2026.1（261.*）、Java 21+**。自动构建提供 macOS Apple Silicon / Intel、Linux x86_64、Windows x86_64 安装包；原生库按平台分别打包。项目架构和协作要求见 [AGENTS.md](AGENTS.md)。
+支持 **IDEA 2026.1（261.*）、Java 21+**。自动构建发布一个统一插件 ZIP，Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64 共用同一文件；插件按当前系统自动选择内置原生库。项目架构和协作要求见 [AGENTS.md](AGENTS.md)。
 
 ## 安装与入口
 
 IDEA → Settings → Plugins → 齿轮 → Install Plugin from Disk，选择：
 
-[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。Apple Silicon 选择 `mybatis-assistant-0.5.0-macos-aarch64.zip`；Intel Mac、Linux 和 Windows 选择对应平台的 ZIP。
+[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。选择 **`mybatis-assistant-0.5.1.zip`**，Windows 和 Mac 使用同一个文件，无需解压。GitHub 自动附加的 `Source code (zip)` 是源码包，不能直接安装。
 
-本地构建包位于 `build/distributions/`。Release 中的 `SHA256SUMS-平台.txt` 与 `verification-平台.json` 提供完整性校验和归档检查结果。
+Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和归档检查结果。支持上述四个系统/处理器组合；Windows ARM64、Linux ARM64 等组合尚无内置原生库。
 
 重启后从 Tools → MyBatis Assistant 打开工具。对比体验时可暂时禁用原插件，避免显示两套提示。
 
@@ -88,17 +88,25 @@ JAVA_HOME=/path/to/jdk21 ./gradlew runIde
 
 源码仓库：[HarryJLS/mybatisplus](https://github.com/HarryJLS/mybatisplus)，主分支为 `main`。向 `main` 推送代码会触发 [Build and release plugin](https://github.com/HarryJLS/mybatisplus/actions/workflows/build-plugin.yml)；也可在 Actions 手动运行。Pull Request 执行测试和打包，成功发布只在 `main` 上进行。
 
-流水线下载固定 **IDEA 2026.1.4** SDK，使用 JDK 21、Rust stable，在四个平台运行 Rust 测试、Java/JNI/MyBatis 核心断言和归档/注册实现/原生库架构校验。构建成功后，Actions 的 Artifacts 保留安装包、SHA256 和报告 30 天；四个平台全部成功后，自动创建 Release `v插件版本-build.流水线编号` 并上传同一套附件。普通 push 不必修改版本或创建 tag；编号让同一插件版本的不同构建也能分别下载，失败的构建不会发布 Release。
+流水线下载固定 **IDEA 2026.1.4** SDK，使用 JDK 21、Rust stable，在四个平台运行 Rust 测试、Java/JNI/MyBatis 核心断言和归档/注册实现/原生库架构校验。四个平台构建成功后，合并为 **`mybatis-assistant-版本.zip`**，校验共享 Java 代码/依赖一致和全部原生库架构，再在四个平台从这个最终 ZIP 加载原生引擎并测试日志/DDL。Actions 的 **`mybatis-assistant`** 附件保留统一安装包、SHA256 和报告 30 天；最终 ZIP 的四平台测试全部通过后，自动创建 Release `v插件版本-build.流水线编号` 并上传这三个文件。普通 push 不必修改版本或创建 tag；编号让同一插件版本的不同构建也能分别下载，失败的构建不会发布 Release。
 
-IDEA 界面集成测试、可选 Kotlin/Spring/Database 专测及 H2/iBATIS 运行时对照仍使用上面的本地命令。自动打包通过不代表已验证全部 IDE 操作或真实生产数据库。切换到其他平台时，需要重新编译对应原生库，不支持用单个平台包替代全部平台。
+IDEA 界面集成测试、可选 Kotlin/Spring/Database 专测及 H2/iBATIS 运行时对照仍使用上面的本地命令。自动打包通过不代表已验证全部 IDE 操作或真实生产数据库。发布的统一 ZIP 可直接用于已覆盖的系统/处理器组合；其他组合需另行编译原生库。
 
-本地默认使用已安装的 IDEA；需要下载 SDK 时使用 `./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin`。Windows 可用 `gradlew.bat`。发布任务使用本次流水线的 GitHub 临时令牌，无需设置个人令牌或 Marketplace 密钥。
+本地默认使用已安装的 IDEA；需要下载 SDK 时使用 `./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin`。Windows 可用 `gradlew.bat`。单台机器的本地构建输出在 `build/distributions/`，带平台后缀，仅包含本机原生库；CI 的 `platform-build-*` 是合并所用中间附件。统一安装包位于 `build/universal-artifacts/`，命名不带平台后缀。发布任务使用本次流水线的 GitHub 临时令牌，无需设置个人令牌或 Marketplace 密钥。
 
 性能设计和样例数据见 [性能报告](docs/performance.md)。`MyBatisCodeHelper-Pro/` 为本地参考资源约定目录，不纳入源码上传或发布包，当前源码和构建不依赖它；结构分析见 [参考资源说明](docs/reference-analysis.md)。
 
 ## 版本记录
 
 日期采用 Asia/Shanghai。0.1.0–0.5.0 的功能最初在本地开发，没有独立的历史 Git commit；2026-11-21 首次上传以当前完整源码快照建立 Git 历史。历史条目的“未提交”表示该历史版本没有独立提交，不据此虚构提交记录。
+
+### 0.5.1
+
+- **更新日期：2026-11-21；提交日期：2026-11-21。**
+- 发布改为单个 `mybatis-assistant-0.5.1.zip` 插件安装包，包含 macOS aarch64/x86_64、Windows x86_64、Linux x86_64 四套原生库；现有加载器按当前系统自动选择，无需用户选不同平台的 ZIP。
+- CI 保留平台编译中间附件，合并时核验输入完整性、Java 代码/依赖一致和原生库架构；Actions 的 `mybatis-assistant` 与 Release 只交付统一插件 ZIP、`SHA256SUMS.txt`、`verification.json`。增加四个平台从最终 ZIP 实际加载 JNI 并执行日志/DDL 的测试，全部通过才发布。
+- 同步插件、Gradle、MCP 版本及安装说明，明确区分插件 ZIP、GitHub 源码 ZIP 和开发用平台中间包；Windows ARM64、Linux ARM64 等未覆盖组合不声称通用兼容。
+- 验证：0.5.1 本地 15 项 Rust 测试、152 项核心断言、JDK 21 标准 Gradle `coreTest buildPlugin`、macOS 安装包的 41 个注册实现/归档检查和从 ZIP 加载 JNI 的日志/DDL 测试通过；流水线配置通过 actionlint。已发布四个平台的 0.5.0 构建样本成功合并为统一 ZIP，全部原生库架构及注册实现检查、本机从该 ZIP 自动加载 JNI 通过。本次云端 0.5.1 最终安装包的四平台结果以对应 Actions 记录为准，未扩大为 IDE 界面或生产数据库验证。
 
 ### 0.5.0 — 首次源码发布与自动打包
 

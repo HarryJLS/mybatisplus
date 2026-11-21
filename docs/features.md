@@ -1,6 +1,6 @@
 # 功能范围对照
 
-参考：JetBrains Marketplace 插件介绍、官方文档与本地 `3.6.9+2321` 资源包。当前版本为 `0.5.0`；本次继续补充非代码生成的运行接入能力。
+参考：JetBrains Marketplace 插件介绍、官方文档与本地 `3.6.9+2321` 资源包。当前版本为 `0.5.1`；统一插件 ZIP 共用于 Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64，运行功能范围沿用 0.5.0。
 
 | 能力 | 当前实现 | 范围 / 限制 |
 | --- | --- | --- |
@@ -42,4 +42,4 @@
 
 完整复刻原插件还需要数据库适配、其他语言接入、完整语义重构和 MCP 工程；上述剩余范围未在本版实现。
 
-本次验证范围见 README 0.5.0。剩余主要差距包括结合真实表结构的完整 SQL 语义检查、完整动态 SQL 编辑器、全部 Kotlin/Spring 场景、Java Agent、自定义 AI 提示词和代码生成扩展。数据库验证使用临时 H2，未连接用户的 MySQL/PostgreSQL/Oracle 等环境，不能据此声称业务 SQL 已验证。运行接入边界见 [runtime.md](runtime.md)。
+功能验证范围见 README 0.5.0，统一安装包的构建/验证范围见 README 0.5.1。剩余主要差距包括结合真实表结构的完整 SQL 语义检查、完整动态 SQL 编辑器、全部 Kotlin/Spring 场景、Java Agent、自定义 AI 提示词和代码生成扩展。数据库验证使用临时 H2，未连接用户的 MySQL/PostgreSQL/Oracle 等环境，不能据此声称业务 SQL 已验证。运行接入边界见 [runtime.md](runtime.md)。

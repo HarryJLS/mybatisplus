@@ -19,7 +19,7 @@ def main():
     gradle_version = re.search(r'^version\s*=\s*"([^"]+)"', (ROOT / 'build.gradle.kts').read_text(), re.M).group(1)
     if version != gradle_version:
         raise SystemExit('Gradle and plugin.xml versions differ')
-    source = ROOT / f'build/distributions/mybatis-assistant-{version}.zip'
+    source = ROOT / f'build/distributions/mybatis-assistant-{version}-{args.platform}.zip'
     result = verify(source, args.platform)
     output = ROOT / 'build/ci-artifacts'
     output.mkdir(parents=True, exist_ok=True)

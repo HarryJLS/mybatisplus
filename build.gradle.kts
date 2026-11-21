@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "dev.mybatis.assistant"
-version = "0.5.0"
+version = "0.5.1"
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 
 repositories {
@@ -45,6 +45,9 @@ val osName = System.getProperty("os.name").lowercase()
 val platform = if (osName.contains("mac")) "macos" else if (osName.contains("win")) "windows" else "linux"
 val architecture = if (System.getProperty("os.arch") in listOf("aarch64", "arm64")) "aarch64" else "x86_64"
 val libraryName = if (platform == "macos") "libmybatis_engine.dylib" else if (platform == "windows") "mybatis_engine.dll" else "libmybatis_engine.so"
+tasks.named<org.jetbrains.intellij.platform.gradle.tasks.BuildPluginTask>("buildPlugin") {
+    archiveFileName.set("mybatis-assistant-${project.version}-$platform-$architecture.zip")
+}
 tasks.processResources {
     dependsOn(buildNative)
     from("native/target/release/$libraryName") { into("native/$platform-$architecture") }

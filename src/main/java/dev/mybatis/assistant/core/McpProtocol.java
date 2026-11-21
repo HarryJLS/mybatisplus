@@ -35,7 +35,7 @@ public final class McpProtocol {
                     String version=string(params,"protocolVersion",true);
                     result.addProperty("protocolVersion",VERSIONS.contains(version)?version:"2025-06-18");
                     result.add("capabilities",JsonParser.parseString("{\"tools\":{\"listChanged\":false}}"));
-                    result.add("serverInfo",JsonParser.parseString("{\"name\":\"mybatis-assistant\",\"version\":\"0.5.0\"}"));
+                    result.add("serverInfo",JsonParser.parseString("{\"name\":\"mybatis-assistant\",\"version\":\"0.5.1\"}"));
                 }
                 case "ping" -> {}
                 case "tools/list" -> {if(params.has("cursor"))throw new IllegalArgumentException("此工具列表不需要 cursor");result.add("tools",tools());}

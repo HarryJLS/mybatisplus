@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-MyBatis Assistant 是独立实现的 IntelliJ IDEA 插件，提供 MyBatis 3 / iBATIS 2 的 XML 导航、参数补全、映射检查、代码生成与 SQL 预览。当前目标平台为 IDEA 2026.1（261.*）、Java 21+；原生库按构建主机平台打包。
+MyBatis Assistant 是独立实现的 IntelliJ IDEA 插件，提供 MyBatis 3 / iBATIS 2 的 XML 导航、参数补全、映射检查、代码生成与 SQL 预览。当前目标平台为 IDEA 2026.1（261.*）、Java 21+；原生库按构建主机编译，CI 合并为包含 macOS aarch64/x86_64、Windows x86_64 和 Linux x86_64 原生库的统一插件 ZIP。
 
 `MyBatisCodeHelper-Pro/` 是用户提供的参考资源包。保留该目录；不把其中的程序或资源复制进发布包。当前版本的功能范围和限制以 README.md 与 docs/ 为准，不声称完整复刻原插件。
 

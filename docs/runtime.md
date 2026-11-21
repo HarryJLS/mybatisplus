@@ -1,4 +1,6 @@
-# 数据库、MCP、Kotlin 与 Spring（0.5.0）
+# 数据库、MCP、Kotlin 与 Spring（0.5.1）
+
+使用统一的 `mybatis-assistant-0.5.1.zip` 安装，Windows x86_64、macOS Apple Silicon / Intel 与 Linux x86_64 共用该文件；原生引擎仍在首次使用时按当前系统加载。其他处理器/系统组合没有预编译库。数据库、MCP、Kotlin 和 Spring 的功能范围沿用 0.5.0，下文边界保持适用。
 
 ## 数据库连接与执行
 

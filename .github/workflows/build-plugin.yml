@@ -48,24 +48,75 @@ jobs:
         run: cargo test --locked --manifest-path native/Cargo.toml
       - name: Test and build plugin (IDEA 2026.1.4)
         run: bash ./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin
-      - name: Verify and name platform package
+      - name: Verify intermediate platform build
         run: python scripts/prepare_ci_artifact.py --platform '${{ matrix.platform }}'
       - uses: actions/upload-artifact@v4
         with:
-          name: plugin-${{ matrix.platform }}
+          name: platform-build-${{ matrix.platform }}
           path: build/ci-artifacts/*
           if-no-files-found: error
           retention-days: 30
 
-  release:
-    name: Publish release assets
+  assemble:
+    name: Assemble universal plugin ZIP
     needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: platform-build-*
+          path: build/platform-inputs
+      - name: Combine and verify all native libraries
+        run: python scripts/assemble_universal_plugin.py --input-dir build/platform-inputs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mybatis-assistant
+          path: build/universal-artifacts/*
+          if-no-files-found: error
+          retention-days: 30
+
+  native-smoke:
+    name: Test plugin ZIP (${{ matrix.os }})
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: mybatis-assistant
+          path: build/universal-artifacts
+      - name: Load native engine from final installable ZIP
+        run: |
+          python scripts/test_plugin_native.py build/universal-artifacts/mybatis-assistant-*.zip --universal
+
+  release:
+    name: Publish plugin installation ZIP
+    needs: native-smoke
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
-    # Finish an older release before publishing the next one as latest.
     concurrency:
       group: plugin-releases
       cancel-in-progress: false
@@ -73,10 +124,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: plugin-*
+          name: mybatis-assistant
           path: build/release-assets
-          merge-multiple: true
-      - name: Publish plugin ZIPs and checksums
+      - name: Publish universal plugin ZIP and checksum
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

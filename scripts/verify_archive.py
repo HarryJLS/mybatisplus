@@ -19,6 +19,8 @@ PLATFORMS = {
     'windows-x86_64': ('mybatis_engine.dll', 'pe', 0x8664),
 }
 
+UNIVERSAL_PLATFORMS = ('macos-aarch64', 'macos-x86_64', 'linux-x86_64', 'windows-x86_64')
+
 
 def host_platform():
     system = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}[platform.system()]
@@ -28,7 +30,7 @@ def host_platform():
 
 def verify(archive, target):
     version = ET.parse(ROOT / 'src/main/resources/META-INF/plugin.xml').getroot().findtext('version')
-    library, binary_format, machine = PLATFORMS[target]
+    targets = UNIVERSAL_PLATFORMS if target == 'universal' else (target,)
     with zipfile.ZipFile(archive) as z:
         assert z.testzip() is None, 'Corrupt ZIP'
         assert not any('MyBatisCodeHelper-Pro' in n for n in z.namelist()), 'Reference resources in package'
@@ -60,42 +62,53 @@ def verify(archive, target):
                         implementations.append(e.text)
             for impl in implementations:
                 assert impl.replace('.', '/') + '.class' in names, impl
-            native = f'native/{target}/{library}'
-            assert native in names, native
-            assert {n for n in names if n.startswith('native/') and not n.endswith('/')} == {native}, 'Unexpected platform libraries'
-            data = jar.read(native)
-            if binary_format == 'macho':
-                assert data[:4] == bytes.fromhex('cffaedfe'), 'Expected 64-bit Mach-O'
-                actual_machine = struct.unpack_from('<I', data, 4)[0]
-            elif binary_format == 'elf':
-                assert data[:6] == b'\x7fELF\x02\x01', 'Expected 64-bit little-endian ELF'
-                actual_machine = struct.unpack_from('<H', data, 18)[0]
-            else:
-                assert data[:2] == b'MZ', 'Expected PE DLL'
-                offset = struct.unpack_from('<I', data, 0x3c)[0]
-                assert data[offset:offset + 4] == b'PE\x00\x00', 'Invalid PE header'
-                actual_machine = struct.unpack_from('<H', data, offset + 4)[0]
-            assert actual_machine == machine, f'Wrong native architecture for {target}'
+            expected = {f'native/{t}/{PLATFORMS[t][0]}' for t in targets}
+            actual = {n for n in names if n.startswith('native/') and not n.endswith('/')}
+            assert actual == expected, f'Unexpected platform libraries: {actual ^ expected}'
+            native_libraries = []
+            for native_target in targets:
+                library, binary_format, machine = PLATFORMS[native_target]
+                data = jar.read(f'native/{native_target}/{library}')
+                if binary_format == 'macho':
+                    assert data[:4] == bytes.fromhex('cffaedfe'), 'Expected 64-bit Mach-O'
+                    actual_machine = struct.unpack_from('<I', data, 4)[0]
+                elif binary_format == 'elf':
+                    assert data[:6] == b'\x7fELF\x02\x01', 'Expected 64-bit little-endian ELF'
+                    actual_machine = struct.unpack_from('<H', data, 18)[0]
+                else:
+                    assert data[:2] == b'MZ', 'Expected PE DLL'
+                    offset = struct.unpack_from('<I', data, 0x3c)[0]
+                    assert data[offset:offset + 4] == b'PE\x00\x00', 'Invalid PE header'
+                    actual_machine = struct.unpack_from('<H', data, offset + 4)[0]
+                assert actual_machine == machine, f'Wrong native architecture for {native_target}'
+                native_libraries.append({'platform': native_target, 'bytes': len(data)})
             assert 'META-INF/LICENSE' in names and 'META-INF/THIRD_PARTY_NOTICES.md' in names
             assert not any(n.endswith('.class') and not n.startswith('dev/mybatis/assistant/') for n in names)
     return {'archive': archive.name, 'bytes': archive.stat().st_size, 'pluginId': plugin.findtext('id'),
             'version': version, 'platform': target, 'registeredImplementationsChecked': len(implementations),
-            'nativeLibraryBytes': len(data), 'status': 'passed'}
+            'nativeLibraryBytes': sum(n['bytes'] for n in native_libraries),
+            'nativeLibraries': native_libraries, 'status': 'passed'}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', nargs='?', type=pathlib.Path)
-    parser.add_argument('--platform', choices=PLATFORMS)
+    parser.add_argument('--platform', choices=(*PLATFORMS, 'universal'))
     parser.add_argument('--output', type=pathlib.Path, default=ROOT / 'build/archive-verification.json')
     args = parser.parse_args()
-    target = args.platform or host_platform()
+    target = args.platform
     archive = args.archive
     if archive is None:
-        archives = list((ROOT / 'build/distributions').glob(f'mybatis-assistant-*-{target}.zip'))
+        archives = list((ROOT / 'build/distributions').glob('mybatis-assistant-*.zip'))
         if not archives:
             raise SystemExit('Build the platform ZIP first or supply its path')
         archive = max(archives, key=lambda p: p.stat().st_mtime)
+    if target is None:
+        with zipfile.ZipFile(archive) as z:
+            name = next(n for n in z.namelist() if n.endswith('.jar') and '/mybatis-assistant-' in n)
+            with zipfile.ZipFile(io.BytesIO(z.read(name))) as jar:
+                bundled = {n.split('/')[1] for n in jar.namelist() if n.startswith('native/') and not n.endswith('/')}
+        target = 'universal' if bundled == set(UNIVERSAL_PLATFORMS) else host_platform()
     result = verify(archive, target)
     encoded = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     print(encoded, end='')
