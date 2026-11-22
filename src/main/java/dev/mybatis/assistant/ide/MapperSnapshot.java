@@ -1,12 +1,12 @@
 package dev.mybatis.assistant.ide;
 
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.*;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.*;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.*;
 import dev.mybatis.assistant.core.SqlRenderer;
 import java.nio.file.*;
@@ -16,7 +16,7 @@ import java.util.*;
 public final class MapperSnapshot {
     private MapperSnapshot() {}
     public record Input(String xml,String statementId,String json,List<String> related) {
-        public SqlRenderer.Result render()throws Exception{return SqlRenderer.render(xml,statementId,json,related);}
+        public SqlRenderer.Result render()throws Exception{return SqlRenderer.render(xml,statementId,json,related,com.intellij.openapi.progress.ProgressManager::checkCanceled);}
     }
     public static PsiFile file(Project project,String requested)throws Exception{
         Path path=Path.of(requested);if(!path.isAbsolute())path=Path.of(Objects.requireNonNull(project.getBasePath())).resolve(path);
@@ -46,19 +46,40 @@ public final class MapperSnapshot {
         if(root!=null){
             List<XmlTag> matches=MapperModel.metadata(root).tags().getOrDefault(MapperModel.localId(root,id),List.of()).stream().filter(MapperModel::isStatement).toList();
             if(matches.size()!=1)throw new IllegalArgumentException("语句 id 不存在或有多个 databaseId 候选，请明确语句");
-            includes(root,new HashSet<>(),related,0);return new Input(file.getText(),matches.getFirst().getAttributeValue("id"),json,List.copyOf(related));
+            String source=file.getText();new Includes(file,source.length(),related).visit(matches.getFirst(),0);
+            return new Input(source,matches.getFirst().getAttributeValue("id"),json,List.copyOf(related));
         }
         List<PsiMethod> methods=new ArrayList<>();if(file instanceof PsiJavaFile java)for(PsiClass cls:java.getClasses())methods.addAll(Arrays.asList(cls.getMethods()));
         for(MapperLanguageSupport support:MapperLanguageSupport.EP.getExtensionList())methods.addAll(support.methods(file));
         List<PsiMethod> matches=methods.stream().filter(m->m.getName().equals(id)).toList();if(matches.size()!=1)throw new IllegalArgumentException("注解方法不存在或重载不唯一");
         return new Input(AnnotationSql.mapperXml(matches.getFirst()),id,json,List.of());
     }
-    private static void includes(XmlTag root,Set<String> seen,List<String> xml,int depth){
-        String namespace=Objects.requireNonNullElse(root.getAttributeValue("namespace"),root.getContainingFile().getName());
-        if(!seen.add(namespace))return;if(depth>32 || seen.size()>64)throw new IllegalArgumentException("跨 Mapper include 展开超过上限");
-        for(XmlTag include:PsiTreeUtil.findChildrenOfType(root,XmlTag.class))if(include.getName().equals("include")){
-            String ref=include.getAttributeValue("refid");if(ref==null || !ref.contains(".") || ref.contains("${"))continue;String ns=ref.substring(0,ref.lastIndexOf('.'));if(seen.contains(ns))continue;
-            for(XmlTag other:MapperModel.xmls(root.getProject(),ns)){String source=other.getContainingFile().getText();if(xml.stream().mapToLong(String::length).sum()+source.length()>8*1024*1024)throw new IllegalArgumentException("关联 Mapper 超过 8 MiB");xml.add(source);includes(other,seen,xml,depth+1);}
+    /** Request-local PSI only. Follow selected statement fragments, including split namespaces. */
+    private static final class Includes {
+        private final Set<PsiFile> files=new HashSet<>();
+        private final Set<XmlTag> visited=new HashSet<>();
+        private final Map<String,List<XmlTag>> namespaces=new HashMap<>();
+        private final XmlTag scope;
+        private final List<String> xml;private long length;private int steps;
+        Includes(PsiFile main,long length,List<String> xml){files.add(main);this.scope=MapperModel.root(main);this.length=length;this.xml=xml;}
+        void visit(XmlTag tag,int depth){
+            ProgressManager.checkCanceled();
+            if(depth>64 || ++steps>100000)throw new IllegalArgumentException("include 展开超过上限");
+            if(tag.getName().equals("include")){
+                String ref=tag.getAttributeValue("refid");if(ref==null || ref.contains("${"))return;
+                // MyBatis resolves nested bare refids in the calling mapper's namespace.
+                XmlTag context=MapperModel.isLegacy(scope)?tag:scope;
+                XmlTag target=MapperModel.definition(context,ref,"sql",namespaces);if(target==null)return;
+                PsiFile file=target.getContainingFile();
+                if(files.add(file)){
+                    if(files.size()>65 || length+file.getTextLength()>8*1024*1024)throw new IllegalArgumentException("关联 Mapper 超过 64 个文件或 8 MiB");
+                    String source=file.getText();length+=source.length();xml.add(source);
+                }
+                // The renderer still detects cycles and accounts for repeated expansion.
+                if(visited.add(target))visit(target,depth+1);
+                return;
+            }
+            for(XmlTag child:tag.getSubTags())visit(child,depth+1);
         }
     }
 }

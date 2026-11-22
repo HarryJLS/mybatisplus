@@ -1,6 +1,6 @@
-# 数据库、MCP、Kotlin 与 Spring（0.5.1）
+# 数据库、MCP、Kotlin 与 Spring（0.5.6）
 
-使用统一的 `mybatis-assistant-0.5.1.zip` 安装，Windows x86_64、macOS Apple Silicon / Intel 与 Linux x86_64 共用该文件；原生引擎仍在首次使用时按当前系统加载。其他处理器/系统组合没有预编译库。数据库、MCP、Kotlin 和 Spring 的功能范围沿用 0.5.0，下文边界保持适用。
+发布时使用统一的 `mybatis-assistant-0.5.6.zip` 安装；当前 0.5.6 为未发布开发版本，本机测试包仅含 macOS aarch64 原生库。发布后的统一包供 Windows x86_64、macOS Apple Silicon / Intel 与 Linux x86_64 共用；原生引擎仍在首次使用时按当前系统加载。其他处理器/系统组合没有预编译库。数据库、MCP、Kotlin 和 Spring 的运行边界保持适用；0.5.5 新增 Mapper 文件/接口与跳转标记的原创鱼形图标，Kotlin 通过可选扩展加载。0.5.6 改为 XML 红色、接口蓝色的小鱼，跳转标记按目标类型配色，并过滤 XML 属性引号产生的重复项。
 
 ## 数据库连接与执行
 
@@ -62,3 +62,11 @@ Java 入口的字符上限包括 XML 4 Mi、JSON 1 Mi、关联 Mapper 总量 8 M
 Spring 字面量 MapperScan/MapperScans 支持 value/basePackages/basePackageClasses、annotationClass 和 markerInterface。包范围使用平台索引与 PSI 生命周期缓存，最多 256 个包、4096 个候选类。Bean 名称按默认类名规则生成，类型保持 Mapper 接口。标准 MyBatis/MyBatis-Plus Boot 自动配置可识别 @Mapper；存在显式 MapperScan 时由显式配置接管。动态包名、元注解、自定义命名器/工厂、复杂条件和 XML Spring 扫描未完整覆盖，明确跳过。
 
 这些是独立实现的基础兼容能力，不宣称完整复刻原插件。数据库执行结果、离线渲染、IDE 检查和业务测试分别报告。
+
+## IDEA 2026.3 与单次预览缓存
+
+0.5.3 起完整接入测试使用 IDEA 2026.3 / JBR 25，构建需要能读取 Java 25 SDK 类的编译器，插件自身输出仍为 Java 21 字节码。更新插件通过 IDEA 的启动安装队列在重启时生效，避免运行中覆盖已打开的 JAR。
+
+预览沿用 MyBatis 3.5.19 SQL 节点、OGNL 与参数规则，表达式缓存由单次请求拥有，不再写入 MyBatis 的静态表达式缓存；不求值业务类方法。0.5.4 的 GUI、数据库入口与 MCP 共用按需快照，只收集当前语句实际使用的 include 文件，支持同 namespace 分文件 SQL 片段；仍保持输入、深度、步骤与输出限制。
+
+0.5.4 已在本机 IDEA 2026.3 重启后确认加载，同 namespace 分文件片段的现场失败案例已通过；真实进程的缓存累积、有限时长 CPU/RSS 和原生懒加载结果见 [性能报告](performance.md)。业务对象自定义方法仍不在离线求值范围内。

@@ -2,6 +2,7 @@
 use jni::{objects::{JClass, JString}, sys::jstring, JNIEnv};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::{borrow::Cow,collections::HashSet};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,34 +30,36 @@ pub fn snake(input: &str) -> String {
 }
 
 /// Split outside strings, quoted identifiers, nested parentheses and SQL comments.
-fn split_sql(input: &str, separator: u8) -> Vec<String> {
+fn split_sql(input: &str, separator: u8) -> impl Iterator<Item=&str> {
     let b = input.as_bytes();
     let (mut depth, mut quote, mut start, mut i) = (0i32, 0u8, 0usize, 0usize);
-    let mut out = Vec::new();
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' { i += 2; continue; }
-            if c == quote {
-                if b.get(i+1) == Some(&quote) { i += 2; continue; }
-                quote = 0;
-            }
-        } else {
-            match c {
-                b'\'' | b'"' | b'`' => quote = c,
-                b'[' => quote = b']',
-                b'(' => depth += 1,
-                b')' => depth -= 1,
-                _ if c == separator && depth == 0 => {
-                    out.push(input[start..i].trim().to_owned()); start = i+1;
+    let mut finished=false;
+    std::iter::from_fn(move || {
+        if finished {return None;}
+        while i < b.len() {
+            let c = b[i];
+            if quote != 0 {
+                if c == b'\\' { i += 2; continue; }
+                if c == quote {
+                    if b.get(i+1) == Some(&quote) { i += 2; continue; }
+                    quote = 0;
                 }
-                _ => (),
+            } else {
+                match c {
+                    b'\'' | b'"' | b'`' => quote = c,
+                    b'[' => quote = b']',
+                    b'(' => depth += 1,
+                    b')' => depth -= 1,
+                    _ if c == separator && depth == 0 => {
+                        let part=input[start..i].trim();i+=1;start=i;return Some(part);
+                    }
+                    _ => (),
+                }
             }
+            i += 1;
         }
-        i += 1;
-    }
-    out.push(input[start..].trim().to_owned());
-    out
+        finished=true;Some(input[start..].trim())
+    })
 }
 
 fn identifier(input: &str) -> Result<(String, &str), String> {
@@ -74,7 +77,8 @@ fn identifier(input: &str) -> Result<(String, &str), String> {
     }
 }
 
-fn remove_comments(input: &str) -> String {
+fn remove_comments(input: &str) -> Cow<'_,str> {
+    if !input.contains("--") && !input.contains("/*") {return Cow::Borrowed(input);}
     let b = input.as_bytes(); let mut out = Vec::with_capacity(b.len());
     let (mut quote, mut i) = (0u8, 0usize);
     while i < b.len() {
@@ -95,15 +99,14 @@ fn remove_comments(input: &str) -> String {
         }
         i+=1;
     }
-    String::from_utf8(out).expect("only ASCII comments were removed")
+    Cow::Owned(String::from_utf8(out).expect("only ASCII comments were removed"))
 }
 
 pub fn parse_ddl(input: &str) -> Result<Table, String> {
     let clean = remove_comments(input);
-    let lower = clean.to_ascii_lowercase();
-    let pos = lower.find("create table").ok_or("请粘贴 CREATE TABLE 语句")? + 12;
+    let pos = clean.as_bytes().windows(12).position(|part|part.eq_ignore_ascii_case(b"create table")).ok_or("请粘贴 CREATE TABLE 语句")? + 12;
     let mut rest = clean[pos..].trim();
-    if rest.to_ascii_lowercase().starts_with("if not exists") { rest=rest[13..].trim(); }
+    if rest.as_bytes().get(..13).is_some_and(|part|part.eq_ignore_ascii_case(b"if not exists")) { rest=rest[13..].trim(); }
     let (mut name, mut rest) = identifier(rest)?;
     // Qualified schema.table, including quoted names.
     if rest.trim_start().starts_with('.') {
@@ -130,17 +133,18 @@ pub fn parse_ddl(input: &str) -> Result<Table, String> {
         } i+=1;
     }
     let end=end.ok_or("表定义括号或字符串未闭合")?;
-    let mut columns=Vec::new(); let mut primary=Vec::new();
+    let mut columns=Vec::new(); let mut primary=HashSet::new();
     for part in split_sql(&rest[1..end], b',') {
         if part.is_empty() { continue; }
-        let (word,tail)=identifier(&part)?;
+        let (word,tail)=identifier(part)?;
         let key=word.to_ascii_lowercase();
         if key=="primary" || key=="constraint" && tail.to_ascii_lowercase().contains("primary key") {
             if let (Some(a),Some(z))=(part.find('('),part.rfind(')')) {
-                for col in split_sql(&part[a+1..z],b',') { primary.push(identifier(&col)?.0); }
+                for col in split_sql(&part[a+1..z],b',') { primary.insert(identifier(col)?.0); }
             } continue;
         }
         if ["constraint","unique","key","index","foreign","check","fulltext","spatial"].contains(&key.as_str()) { continue; }
+        if columns.len()>=2000 {return Err("单表字段数量超过 2000".into());}
         let tail=tail.trim();
         if tail.is_empty() { return Err(format!("字段 {word} 缺少类型")); }
         let mut depth=0; let mut end=tail.len();
@@ -157,7 +161,6 @@ pub fn parse_ddl(input: &str) -> Result<Table, String> {
     }
     for col in &mut columns { if primary.contains(&col.name) {col.primary_key=true;col.nullable=false;} }
     if columns.is_empty() { return Err("未解析到字段".into()); }
-    if columns.len()>2000 {return Err("单表字段数量超过 2000".into());}
     Ok(Table{name,columns})
 }
 
@@ -225,7 +228,7 @@ fn parse_params(line:&str)->Result<Vec<String>,String> {
 }
 
 pub fn logs_to_sql(input:&str)->Result<String,String> {
-    let (mut pending,mut context)=(None,None);let mut out=Vec::new();
+    let (mut pending,mut context)=(None,None);let mut out=String::new();
     for line in input.lines() {
         if let Some(pos)=line.find("Preparing:") {
             if pending.is_some() {return Err("发现交错的 Preparing 日志，请按线程筛选后重试".into());}
@@ -235,12 +238,14 @@ pub fn logs_to_sql(input:&str)->Result<String,String> {
             let sql=pending.take().ok_or("Parameters 日志前缺少 Preparing" )?;
             let thread=log_thread(&line[..pos]);
             if context.flatten().is_some_and(|t|Some(t)!=thread) {return Err("日志线程不一致，请先按线程筛选".into());}
-            out.push(format!("{};",substitute(&sql,&parse_params(line[pos+11..].trim())?)?.trim_end_matches(';')));
+            let rendered=substitute(&sql,&parse_params(line[pos+11..].trim())?)?;
+            if !out.is_empty() {out.push_str("\n\n");}
+            out.push_str(rendered.trim_end_matches(';'));out.push(';');
         }
     }
     if pending.is_some() {return Err("Preparing 日志缺少 Parameters 行".into());}
     if out.is_empty() {return Err("未找到 Preparing / Parameters 日志".into());}
-    Ok(out.join("\n\n"))
+    Ok(out)
 }
 fn log_thread(prefix:&str)->Option<&str> {
     prefix.find('[').and_then(|a|prefix[a+1..].find(']').map(|z|&prefix[a+1..a+1+z]))
@@ -296,4 +301,15 @@ mod tests {
     #[test] fn logs_thread() {assert!(logs_to_sql("[one] Preparing: select ?\n[two] Parameters: 1(Integer)").is_err());}
     #[test] fn logs_unicode() {assert_eq!(logs_to_sql("Preparing: select ? as 中文\nParameters: 你好(String)").unwrap(),"select '你好' as 中文;");}
     #[test] fn malformed_request() {assert!(process("bad json").contains("false"));}
+    #[test] fn ddl_streams_quoted_nested_unicode_columns() {
+        let table=parse_ddl("CrEaTe TaBlE IF NOT EXISTS x (`名字` varchar(20) default 'a,b', id decimal(10,2), PRIMARY KEY (`名字`,id))").unwrap();
+        assert_eq!(table.columns.len(),2);assert_eq!(table.columns[0].name,"名字");assert!(table.columns.iter().all(|column|column.primary_key));
+    }
+    #[test] fn ddl_rejects_column_limit_while_streaming() {
+        let columns=(0..2001).map(|i|format!("c{i} int")).collect::<Vec<_>>().join(",");
+        assert_eq!(parse_ddl(&format!("CREATE TABLE x ({columns})")).unwrap_err(),"单表字段数量超过 2000");
+    }
+    #[test] fn logs_stream_multiple_pairs() {
+        assert_eq!(logs_to_sql("Preparing: select ?;\nParameters: 1(Integer)\nPreparing: select ?\nParameters: 中文(String)").unwrap(),"select 1;\n\nselect '中文';");
+    }
 }

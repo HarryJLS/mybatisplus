@@ -31,7 +31,7 @@ def main():
         f'源码：`{sha}`\n\n[构建与测试记录]({os.environ["BUILD_URL"]})\n\n'
         f'**插件安装包：`{archive.name}`**，同一个 ZIP 用于 Windows x86_64、'
         'macOS Apple Silicon / Intel 和 Linux x86_64，插件自动选择内置原生库。'
-        '适用 IntelliJ IDEA 2026.1（261.*）、Java 21+。\n\n'
+        '兼容声明为 IntelliJ IDEA 2026.1–2026.3（261–263.*）、Java 21+；本次本地完整验证 IDEA 2026.3。\n\n'
         'IDEA → Settings → Plugins → Install Plugin from Disk，选择插件 ZIP 后重启，无需解压。'
         'GitHub 自动附加的 Source code ZIP 是源码，不能直接安装。\n\n'
         '验证：四个平台的 Rust 测试、Java/JNI/MyBatis 核心断言，统一 ZIP 的注册实现、'

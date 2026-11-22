@@ -38,7 +38,8 @@ public final class MapperReferences extends PsiReferenceContributor {
     }
     private static PsiReference[] attribute(XmlAttributeValue value){
         if(MapperModel.root(value)==null || DumbService.isDumb(value.getProject()))return PsiReference.EMPTY_ARRAY;
-        XmlAttribute attr=(XmlAttribute)value.getParent();XmlTag tag=attr.getParent();String name=attr.getName(),text=value.getValue();
+        if(!(value.getParent() instanceof XmlAttribute attr))return PsiReference.EMPTY_ARRAY;
+        XmlTag tag=attr.getParent();String name=attr.getName(),text=value.getValue();
         TextRange range=value.getValueTextRange().shiftLeft(value.getTextRange().getStartOffset());List<PsiReference> refs=new ArrayList<>();
         switch(name){
             case "namespace" -> refs.add(new Ref(value,range,()->MapperModel.mapperClass(MapperModel.root(tag)),true));
@@ -95,8 +96,7 @@ public final class MapperReferences extends PsiReferenceContributor {
             if(segment.start()>0 && path.charAt(segment.start()-1)!='.')continue;
             String full=path.substring(0,segment.end());
             refs.add(new Ref(host,new TextRange(range.getStartOffset()+segment.start(),range.getStartOffset()+segment.end()),()->{
-                XmlTag statement=MapperModel.statement(host);PsiMethod method=statement==null?null:MapperModel.method(statement);
-                var symbol=ParameterModel.of(method,host).resolve(full);return symbol==null?null:symbol.declaration();
+                var symbol=ParameterModel.of(null,host).resolve(full);return symbol==null?null:symbol.declaration();
             },false));
         }
     }

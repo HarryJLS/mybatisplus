@@ -20,7 +20,8 @@ public final class MapperCompletion extends CompletionContributor {
         if(DumbService.isDumb(pos.getProject()) || !AssistantSettings.get(pos.getProject()).completion || MapperModel.root(pos)==null)return;
         XmlAttributeValue attr=PsiTreeUtil.getParentOfType(pos,XmlAttributeValue.class,false);
         if(attr!=null){
-            XmlAttribute a=(XmlAttribute)attr.getParent();XmlTag tag=a.getParent();String name=a.getName();
+            if(!(attr.getParent() instanceof XmlAttribute a))return;
+            XmlTag tag=a.getParent();String name=a.getName();
             int offset=Math.max(0,p.getOffset()-attr.getValueTextRange().getStartOffset());String value=attr.getValue();String before=value.substring(0,Math.min(value.length(),offset));
             if(Set.of("resultType","parameterType","type","ofType","javaType","resultClass","parameterClass","class").contains(name)){
                 TypeAliases.names(attr).forEach((alias,type)->result.addElement(LookupElementBuilder.create(alias).withTypeText(type)));return;
@@ -76,7 +77,7 @@ public final class MapperCompletion extends CompletionContributor {
     private static void methods(PsiElement pos,String before,CompletionResultSet result){
         String path=before.replaceAll("(?s).*[^\\p{L}\\p{N}_.\\[\\]]","");int dot=path.lastIndexOf('.');if(dot<0)return;
         XmlTag statement=MapperModel.statement(pos);if(statement==null)return;
-        var symbol=ParameterModel.of(MapperModel.method(statement),pos).resolve(path.substring(0,dot));
+        var symbol=ParameterModel.of(null,pos).resolve(path.substring(0,dot));
         if(symbol==null || !(symbol.type() instanceof PsiClassType type))return;PsiClass cls=type.resolve();if(cls==null)return;
         CompletionResultSet target=result.withPrefixMatcher(path.substring(dot+1));Set<String> seen=new HashSet<>();
         for(PsiMethod method:cls.getAllMethods())if(method.hasModifierProperty(PsiModifier.PUBLIC) && !method.hasModifierProperty(PsiModifier.STATIC) && method.getParameterList().getParametersCount()==0 && seen.add(method.getName()))target.addElement(LookupElementBuilder.create(method.getName()+"()").withTypeText(method.getReturnType()==null?"":method.getReturnType().getPresentableText()));

@@ -17,10 +17,10 @@ public final class KotlinMapperGutter implements LineMarkerProvider {
             if(element.getFirstChild()!=null || DumbService.isDumb(element.getProject()) || !AssistantSettings.get(element.getProject()).gutter)continue;
             if(element.getParent() instanceof KtClass cls && cls.isInterface() && cls.getNameIdentifier()==element){
                 PsiClass light=LightClassUtilsKt.toLightClass(cls);if(light==null)continue;var targets=MapperModel.mapperRoots(light);
-                if(!targets.isEmpty())markers.add(NavigationGutterIconBuilder.create(com.intellij.icons.AllIcons.Gutter.ImplementedMethod).setTargets(targets).setTooltipText("跳转到 Kotlin Mapper XML").createLineMarkerInfo(element));
+                if(!targets.isEmpty())markers.add(NavigationGutterIconBuilder.create(AssistantIcons.XML_MAPPER).setTargets(targets).setTooltipText("跳转到 Kotlin Mapper XML").createLineMarkerInfo(element));
             }else if(element.getParent() instanceof KtNamedFunction function && function.getNameIdentifier()==element){
                 PsiMethod method=new KotlinMapperSupport().method(function);if(method==null)continue;var targets=MapperModel.statements(method);
-                if(!targets.isEmpty())markers.add(NavigationGutterIconBuilder.create(com.intellij.icons.AllIcons.Gutter.ImplementedMethod).setTargets(targets).setTooltipText("跳转到 Mapper XML").createLineMarkerInfo(element));
+                if(!targets.isEmpty())markers.add(NavigationGutterIconBuilder.create(AssistantIcons.XML_MAPPER).setTargets(targets).setTooltipText("跳转到 Mapper XML").createLineMarkerInfo(element));
             }
         }
     }

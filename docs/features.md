@@ -1,10 +1,11 @@
 # 功能范围对照
 
-参考：JetBrains Marketplace 插件介绍、官方文档与本地 `3.6.9+2321` 资源包。当前版本为 `0.5.1`；统一插件 ZIP 共用于 Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64，运行功能范围沿用 0.5.0。
+参考：JetBrains Marketplace 插件介绍、官方文档与本地 `3.6.9+2321` 资源包。当前开发版本为 `0.5.6`（未发布）；发布时统一插件 ZIP 共用于 Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64。
 
 | 能力 | 当前实现 | 范围 / 限制 |
 | --- | --- | --- |
 | Mapper/XML 跳转 | 已实现 | Java Mapper namespace 与方法 id |
+| Mapper 鱼形图标 | 已实现 | 原创浅色/深色 SVG；XML 红色、接口蓝色，跳转标记按目标类型配色；过滤属性引号重复标记；项目树、编辑器标签与 Java/Kotlin 接口展示；接口/方法→XML、XML namespace/语句 id→接口/方法使用可点击鱼形标记，多目标保留选择列表；接口按 @Mapper 或 XML 关联识别，Kotlin 为可选 K2 接入 |
 | namespace 持久索引 | 已实现 | MyBatis 读取根属性；iBATIS 同时索引声明的语句 id；只处理变化文件 |
 | iBATIS 接口/XML | 已实现 | sqlMap、全名/唯一简称、自定义映射、无 namespace 文件名；接口与方法图标 |
 | iBATIS 实现类导航 | 已实现 | 点击后按 Java 索引查找实现；读取静态 SQL id、常量拼接和同类辅助方法 |

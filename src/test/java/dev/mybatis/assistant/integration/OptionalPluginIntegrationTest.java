@@ -39,6 +39,35 @@ public final class OptionalPluginIntegrationTest extends LightJavaCodeInsightFix
         PsiMethod method=new KotlinMapperSupport().methods(file).getFirst();assertEquals("SELECT #{id}",new KotlinMapperSupport().annotationSql(method));
         var input=MapperSnapshot.of(file,"find","{\"id\":3}");assertEquals(List.of(new java.math.BigDecimal(3)),input.render().parameters());
     }
+    public void testKotlinPropertyEditInvalidatesJavaMemberView(){
+        PsiFile file=myFixture.addFileToProject("sample/MutableItem.kt","package sample\ndata class MutableItem(val name: String)\n");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        PsiClass cls=MapperModel.classByName(getProject(),"sample.MutableItem");assertNotNull(cls);
+        assertNotNull(ParameterModel.properties(JavaPsiFacade.getElementFactory(getProject()).createType(cls)).get("name"));
+        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(getProject(),()->{PsiDocumentManager.getInstance(getProject()).getDocument(file).setText("package sample\ndata class MutableItem(val title: String)\n");});
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments();IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        PsiClass changed=MapperModel.classByName(getProject(),"sample.MutableItem");assertNotNull(changed);
+        var properties=ParameterModel.properties(JavaPsiFacade.getElementFactory(getProject()).createType(changed));
+        assertNull(properties.get("name"));assertNotNull(properties.get("title"));
+    }
+    public void testKotlinFishFileClassAndGutterTargets(){
+        KtFile file=(KtFile)myFixture.addFileToProject("sample/FishMapper.kt","package sample\ninterface FishMapper { fun find(): Long }\n");
+        XmlFile xml=(XmlFile)myFixture.addFileToProject("mapper/Fish.xml","<mapper namespace='sample.FishMapper'><select id='find'>SELECT 1</select></mapper>");
+        IndexingTestUtil.waitUntilIndexesAreReady(getProject());var provider=new dev.mybatis.assistant.ide.kotlin.KotlinMapperIconProvider();
+        var cls=(org.jetbrains.kotlin.psi.KtClass)file.getDeclarations().getFirst();
+        assertSame(AssistantIcons.JAVA_MAPPER,provider.getIcon(file,0));assertSame(AssistantIcons.JAVA_MAPPER,provider.getIcon(cls,0));
+        var function=(org.jetbrains.kotlin.psi.KtNamedFunction)cls.getDeclarations().getFirst();
+        List<com.intellij.codeInsight.daemon.LineMarkerInfo<?>> markers=new java.util.ArrayList<>();
+        new dev.mybatis.assistant.ide.kotlin.KotlinMapperGutter().collectSlowLineMarkers(List.of(cls.getNameIdentifier(),function.getNameIdentifier()),markers);
+        assertEquals(2,markers.size());
+        for(var marker:markers){
+            assertSame(AssistantIcons.XML_MAPPER,marker.getIcon());assertNotNull(marker.getNavigationHandler());
+            var renderer=(com.intellij.codeInsight.navigation.NavigationGutterIconRenderer)marker.getNavigationHandler();
+            assertTrue(renderer.isNavigateAction());assertEquals(1,renderer.getTargetElements().size());
+            assertEquals(xml,renderer.getTargetElements().getFirst().getContainingFile());
+        }
+        assertTrue(com.intellij.ide.IconProvider.EXTENSION_POINT_NAME.getExtensionList().stream().anyMatch(p->p instanceof dev.mybatis.assistant.ide.kotlin.KotlinMapperIconProvider));
+        assertNull(provider.getIcon(myFixture.addFileToProject("sample/OrdinaryMapper.kt","package sample\ninterface OrdinaryMapper {}\n"),0));
+    }
     public void testKotlinWildcardCollectionBinding(){
         myFixture.addFileToProject("sample/ListMapper.kt","package sample\nimport org.apache.ibatis.annotations.Param\ndata class Item(val name: String)\ninterface ListMapper { fun find(@Param(\"users\") users: List<Item>): List<Item> }\n");XmlFile xml=(XmlFile)myFixture.addFileToProject("mapper/ListMapper.xml","<mapper namespace='sample.ListMapper'><select id='find'>SELECT #{users[0].name}</select></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
         var statement=xml.getRootTag().findFirstSubTag("select");assertNotNull(ParameterModel.of(MapperModel.method(statement),statement).resolve("users[0].name"));

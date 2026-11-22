@@ -3,6 +3,7 @@ package dev.mybatis.assistant.ide;
 import com.google.gson.*;
 import com.intellij.ide.highlighter.XmlFileType;
 import com.intellij.psi.*;
+import com.intellij.psi.xml.*;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.fixtures.LightJavaCodeInsightFixtureTestCase;
 import io.netty.handler.codec.http.*;
@@ -55,5 +56,24 @@ public final class RuntimeIntegrationTest extends LightJavaCodeInsightFixtureTes
     }
     public void testSnapshotPreservesXmlAndParameterInput(){
         myFixture.configureByText(XmlFileType.INSTANCE,"<mapper namespace='sample.mapper.UserMapper'><select id='find'>SELECT #{id}</select></mapper>");var snapshot=MapperSnapshot.capture(myFixture.getFile(),"find","{\"id\":1}");assertEquals("find",snapshot.statementId());assertEquals("{\"id\":1}",snapshot.json());assertTrue(snapshot.related().isEmpty());
+    }
+    public void testSplitNamespaceIncludesResolveAndRender()throws Exception{
+        XmlFile file=(XmlFile)myFixture.addFileToProject("mapper/Statements.xml","<mapper namespace='sample.mapper.UserMapper'><select id='find'>SELECT <include refid='columns'/> FROM users</select></mapper>");
+        XmlFile first=(XmlFile)myFixture.addFileToProject("mapper/Columns.xml","<mapper namespace='sample.mapper.UserMapper'><sql id='columns'>id,<include refid='other'/></sql></mapper>");
+        myFixture.addFileToProject("mapper/Other.xml","<mapper namespace='sample.mapper.UserMapper'><sql id='other'>name</sql></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        XmlTag include=file.getRootTag().findFirstSubTag("select").findFirstSubTag("include");
+        assertEquals(first.getRootTag().findFirstSubTag("sql"),MapperModel.definition(include,"columns","sql"));
+        var input=MapperSnapshot.of(file,"find","{}");assertEquals(2,input.related().size());assertTrue(input.render().sql().replace(" ","").contains("id,name"));
+    }
+    public void testSnapshotIgnoresIncludesOutsideSelectedStatement()throws Exception{
+        XmlFile file=(XmlFile)myFixture.addFileToProject("mapper/Selected.xml","<mapper namespace='sample.mapper.UserMapper'><sql id='unused'><include refid='sample.Unused.body'/></sql><select id='find'>SELECT #{id}</select></mapper>");
+        myFixture.addFileToProject("mapper/Unused.xml","<mapper namespace='sample.Unused'><sql id='body'>id</sql></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        var input=MapperSnapshot.of(file,"find","{\"id\":1}");assertTrue(input.related().isEmpty());assertEquals("SELECT ?",input.render().sql());
+    }
+    public void testForeignFragmentBareRefUsesMyBatisCallingNamespace()throws Exception{
+        XmlFile file=(XmlFile)myFixture.addFileToProject("mapper/Caller.xml","<mapper namespace='sample.mapper.UserMapper'><select id='find'>SELECT <include refid='sample.Foreign.wrapper'/></select></mapper>");
+        myFixture.addFileToProject("mapper/Local.xml","<mapper namespace='sample.mapper.UserMapper'><sql id='local'>id</sql></mapper>");
+        myFixture.addFileToProject("mapper/Foreign.xml","<mapper namespace='sample.Foreign'><sql id='wrapper'><include refid='local'/></sql><sql id='local'>wrong_column</sql></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        var input=MapperSnapshot.of(file,"find","{}");assertEquals(2,input.related().size());assertEquals("SELECT  id",input.render().sql());
     }
 }

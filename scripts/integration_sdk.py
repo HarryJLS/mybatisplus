@@ -53,7 +53,7 @@ def selected_plugins(idea):
                 modules[name]=(folder,required)
                 if item.get('loading-rule')=='required':dependencies.append(('module',name))
         root_dependencies[folder]=dependencies
-    queue=[('plugin',name) for name in ['com.intellij.java','org.jetbrains.kotlin','com.intellij.spring','com.intellij.database']]
+    queue=[('plugin',name) for name in ['com.intellij.java','com.intellij.modules.xml','org.jetbrains.kotlin','com.intellij.spring','com.intellij.database']]
     queue += [('module',name) for name in ['intellij.spring','intellij.spring.core','intellij.database.core.impl','intellij.database.impl','intellij.database.connectivity']]
     selected=set();visited=set()
     while queue:

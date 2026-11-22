@@ -29,10 +29,13 @@ public final class MapperInspection extends LocalInspectionTool {
                     for(String token:a.getValue().split("[,\\s]+"))if(!token.isEmpty() && !token.contains("${") && MapperModel.definition(tag,token,kind)==null)problem(holder,a,"找不到 "+kind+": "+token);
                 }
                 if(!MapperModel.isLegacy(root) && AssistantSettings.get(tag.getProject()).ognlChecks){
-                    ParameterModel model=ParameterModel.of(MapperModel.method(MapperModel.statement(tag)==null?tag:MapperModel.statement(tag)),tag);
+                    ParameterModel model=null;
                     for(String name:List.of("test","collection","value")){
                         if(name.equals("value") && !tag.getName().equals("bind") || name.equals("collection") && !tag.getName().equals("foreach"))continue;
-                        XmlAttribute expression=tag.getAttribute(name);if(expression!=null)OgnlChecks.inspect(expression,model,holder);
+                        XmlAttribute expression=tag.getAttribute(name);if(expression!=null){
+                            if(model==null)model=ParameterModel.of(null,tag);
+                            OgnlChecks.inspect(expression,model,holder);
+                        }
                     }
                 }
                 if(tag.getName().equals("resultMap") && AssistantSettings.get(tag.getProject()).columnChecks)checkColumns(tag,holder);
@@ -40,7 +43,7 @@ public final class MapperInspection extends LocalInspectionTool {
                 XmlAttribute property=tag.getAttribute("property");
                 if(property!=null && property.getValue()!=null){
                     if(MapperModel.isLegacy(root) && MapperReferences.parameterProperty(tag)){
-                        XmlTag statement=MapperModel.statement(tag);ParameterModel model=ParameterModel.of(statement==null?null:MapperModel.method(statement),tag);
+                        ParameterModel model=ParameterModel.of(null,tag);
                         if(!model.dynamic() && model.resolve(property.getValue())==null)problem(holder,property,"找不到 iBATIS 参数属性: "+property.getValue());
                         return;
                     }
@@ -50,13 +53,14 @@ public final class MapperInspection extends LocalInspectionTool {
             }
             @Override public void visitXmlText(@NotNull XmlText text){
                 XmlTag statement=MapperModel.statement(text);if(statement==null)return;
-                ParameterModel model=ParameterModel.of(MapperModel.method(statement),text);
+                ParameterModel model=null;String source=text.getText();
                 boolean legacy=MapperModel.isLegacy(MapperModel.root(text));int group=legacy?2:1;
-                Matcher matcher=(legacy?MapperReferences.LEGACY_PLACEHOLDER:MapperReferences.PLACEHOLDER).matcher(text.getText());
+                Matcher matcher=(legacy?MapperReferences.LEGACY_PLACEHOLDER:MapperReferences.PLACEHOLDER).matcher(source);
                 while(matcher.find()){
+                    if(model==null)model=ParameterModel.of(null,text);
                     String path=matcher.group(group);
                     if(model.resolve(path)==null && !model.dynamic() && !path.equals("_databaseId"))holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(group),matcher.end(group)),"找不到参数或属性: "+path);
-                    if(text.getText().charAt(matcher.start())=='$' && AssistantSettings.get(text.getProject()).warnDollar)holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(),matcher.end()),(legacy?"$…$":"${}")+" 直接拼接 SQL，请确认输入来自可信白名单");
+                    if(source.charAt(matcher.start())=='$' && AssistantSettings.get(text.getProject()).warnDollar)holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(),matcher.end()),(legacy?"$…$":"${}")+" 直接拼接 SQL，请确认输入来自可信白名单");
                 }
             }
         };

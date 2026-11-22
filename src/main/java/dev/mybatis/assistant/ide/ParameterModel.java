@@ -1,6 +1,8 @@
 package dev.mybatis.assistant.ide;
 
 import com.intellij.psi.*;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.psi.util.*;
 import com.intellij.psi.xml.*;
 import java.util.*;
@@ -12,6 +14,7 @@ public final class ParameterModel {
         private final SmartPsiElementPointer<PsiElement> pointer;
         private final PsiType type;
         public Symbol(PsiElement declaration,PsiType type){this.pointer=declaration==null?null:SmartPointerManager.getInstance(declaration.getProject()).createSmartPsiElementPointer(declaration);this.type=type;}
+        private Symbol(PsiType type,Symbol original){this.pointer=original.pointer;this.type=type;}
         public PsiElement declaration(){return pointer==null?null:pointer.getElement();}
         public PsiType type(){return type;}
     }
@@ -25,6 +28,7 @@ public final class ParameterModel {
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> METHOD_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.method");
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> LEGACY_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.ibatis");
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> SPECIALIZED_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.specialized");
+    private static final com.intellij.openapi.util.Key<CachedValue<Map<String,Symbol>>> PROPERTIES_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.class.properties");
     private static ParameterModel specializedBase(XmlTag statement){
         return CachedValuesManager.getManager(statement.getProject()).getCachedValue(statement,SPECIALIZED_CACHE,()->{
             PsiMethod method=MapperModel.method(statement);PsiClass mapper=MapperModel.mapperClass(MapperModel.root(statement));
@@ -59,8 +63,7 @@ public final class ParameterModel {
         // The provider may retain only its owning XML PSI; resolve the Java method when recomputing.
         return CachedValuesManager.getManager(context.getProject()).getCachedValue(context,CONTEXT_CACHE,()->{
             XmlTag statement=MapperModel.statement(context);
-            PsiMethod resolved=statement==null?null:MapperModel.method(statement);
-            ParameterModel bindings=statement!=null && MapperModel.isLegacy(MapperModel.root(statement))?legacyBase(statement):statement==null?base(resolved):specializedBase(statement);
+            ParameterModel bindings=statement!=null && MapperModel.isLegacy(MapperModel.root(statement))?legacyBase(statement):statement==null?base(null):specializedBase(statement);
             return CachedValueProvider.Result.create(scoped(bindings,context),context.getContainingFile(),PsiModificationTracker.MODIFICATION_COUNT,context.getProject().getService(AssistantSettings.class));
         },false);
     }
@@ -136,23 +139,37 @@ public final class ParameterModel {
     public static Map<String,Symbol> properties(PsiType type){
         if(type instanceof PsiArrayType)return Map.of("length",new Symbol(null,PsiTypes.intType()));
         if(!(type instanceof PsiClassType ct))return Map.of();var generic=ct.resolveGenerics();PsiClass cls=generic.getElement();
+        if(cls==null){
+            if(Set.of("java.util.List","java.util.Set","java.util.Collection").contains(ct.rawType().getCanonicalText()))
+                return Map.of("size",new Symbol(null,PsiTypes.intType()),"isEmpty",new Symbol(null,PsiTypes.booleanType()));
+            return Map.of();
+        }
+        Map<String,Symbol> members=CachedValuesManager.getManager(cls.getProject()).getCachedValue(cls,PROPERTIES_CACHE,()->
+            CachedValueProvider.Result.create(classProperties(cls),cls.getContainingFile(),ModelDependencies.types(cls.getProject()),ProjectRootModificationTracker.getInstance(cls.getProject())),false);
+        if(generic.getSubstitutor().getSubstitutionMap().isEmpty())return members;
         Map<String,Symbol> result=new LinkedHashMap<>();
-        if(Set.of("java.util.List","java.util.Set","java.util.Collection").contains(ct.rawType().getCanonicalText()) || InheritanceUtil.isInheritor(type,"java.util.Collection")){
+        members.forEach((name,symbol)->result.put(name,new Symbol(generic.getSubstitutor().substitute(symbol.type()),symbol)));
+        return Collections.unmodifiableMap(result);
+    }
+    private static Map<String,Symbol> classProperties(PsiClass cls){
+        Map<String,Symbol> result=new LinkedHashMap<>();
+        if(Set.of("java.util.List","java.util.Set","java.util.Collection").contains(Objects.requireNonNullElse(cls.getQualifiedName(),"")) || InheritanceUtil.isInheritor(cls,"java.util.Collection")){
             result.put("size",new Symbol(cls,PsiTypes.intType()));result.put("isEmpty",new Symbol(cls,PsiTypes.booleanType()));
         }
-        if(cls==null)return result;
         for(PsiField f:cls.getAllFields())if(!f.hasModifierProperty(PsiModifier.STATIC)){
-            PsiSubstitutor sub=f.getContainingClass()==null?generic.getSubstitutor():TypeConversionUtil.getSuperClassSubstitutor(f.getContainingClass(),cls,generic.getSubstitutor());
+            ProgressManager.checkCanceled();
+            PsiSubstitutor sub=f.getContainingClass()==null?PsiSubstitutor.EMPTY:TypeConversionUtil.getSuperClassSubstitutor(f.getContainingClass(),cls,PsiSubstitutor.EMPTY);
             result.putIfAbsent(f.getName(),new Symbol(f,sub.substitute(f.getType())));
         }
         for(PsiMethod m:cls.getAllMethods()){
+            ProgressManager.checkCanceled();
             if(m.hasModifierProperty(PsiModifier.STATIC) || m.getParameterList().getParametersCount()!=0 || m.getReturnType()==null)continue;
             String name=m.getName(),property=null;
             if(name.startsWith("get") && name.length()>3 && !name.equals("getClass"))property=decap(name.substring(3));
             else if(name.startsWith("is") && name.length()>2)property=decap(name.substring(2));
-            if(property!=null){PsiSubstitutor sub=m.getContainingClass()==null?generic.getSubstitutor():TypeConversionUtil.getSuperClassSubstitutor(m.getContainingClass(),cls,generic.getSubstitutor());result.putIfAbsent(property,new Symbol(m,sub.substitute(m.getReturnType())));}
+            if(property!=null){PsiSubstitutor sub=m.getContainingClass()==null?PsiSubstitutor.EMPTY:TypeConversionUtil.getSuperClassSubstitutor(m.getContainingClass(),cls,PsiSubstitutor.EMPTY);result.putIfAbsent(property,new Symbol(m,sub.substitute(m.getReturnType())));}
         }
-        return result;
+        return Collections.unmodifiableMap(result);
     }
     private static String decap(String s){return s.length()>1 && Character.isUpperCase(s.charAt(0)) && Character.isUpperCase(s.charAt(1))?s:Character.toLowerCase(s.charAt(0))+s.substring(1);}
 }

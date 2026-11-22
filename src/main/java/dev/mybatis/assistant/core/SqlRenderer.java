@@ -9,7 +9,6 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.builder.xml.XMLIncludeTransformer;
 import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.parsing.*;
-import org.apache.ibatis.scripting.xmltags.XMLScriptBuilder;
 import org.apache.ibatis.session.Configuration;
 import com.google.gson.*;
 
@@ -30,6 +29,10 @@ public final class SqlRenderer {
         return f.newDocumentBuilder().parse(new org.xml.sax.InputSource(new StringReader(xml)));
     }
     public static Result render(String xml,String id,String json,List<String> relatedMappers) throws Exception {
+        return render(xml,id,json,relatedMappers,()->{});
+    }
+    public static Result render(String xml,String id,String json,List<String> relatedMappers,Runnable cancellation) throws Exception {
+        cancellation.run();
         if(xml.length()>4*1024*1024 || json.length()>1024*1024)throw new IllegalArgumentException("SQL 预览输入过大");
         if(relatedMappers.size()>64 || relatedMappers.stream().mapToLong(String::length).sum()+xml.length()>8*1024*1024)throw new IllegalArgumentException("关联 Mapper 总输入超过 8 MiB");
         PreviewSafety.jsonText(json);
@@ -48,8 +51,9 @@ public final class SqlRenderer {
         new XMLIncludeTransformer(config,assistant).applyIncludes(statement.getNode());
         JsonElement element=JsonParser.parseString(json);
         if(!element.isJsonObject()) throw new IllegalArgumentException("参数必须是 JSON 对象");
-        PreviewSafety.script(statement.getNode(),element);
-        SqlSource source=new XMLScriptBuilder(config,statement,Map.class).parseScriptNode();
+        PreviewExpressions expressions=new PreviewExpressions(cancellation);
+        PreviewSafety.script(statement.getNode(),element,expressions);
+        SqlSource source=new PreviewScriptBuilder(config,expressions).build(statement);
         Map<String,Object> args=objectMap(element.getAsJsonObject());
         BoundSql bound=source.getBoundSql(args);List<Object> values=new ArrayList<>();List<String> notes=new ArrayList<>();long valueSize=0;
         if(bound.getSql().length()>PreviewSafety.MAX_OUTPUT || bound.getParameterMappings().size()>PreviewSafety.MAX_PARAMS)throw new IllegalArgumentException("预览输出或参数超过上限");

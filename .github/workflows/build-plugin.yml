@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -46,8 +46,8 @@ jobs:
           rustup default stable
       - name: Test native engine
         run: cargo test --locked --manifest-path native/Cargo.toml
-      - name: Test and build plugin (IDEA 2026.1.4)
-        run: bash ./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin
+      - name: Test and build plugin (IDEA 2026.3)
+        run: bash ./gradlew --no-daemon -PideaVersion=2026.3 coreTest buildPlugin
       - name: Verify intermediate platform build
         run: python scripts/prepare_ci_artifact.py --platform '${{ matrix.platform }}'
       - uses: actions/upload-artifact@v4

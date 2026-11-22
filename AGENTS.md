@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-MyBatis Assistant 是独立实现的 IntelliJ IDEA 插件，提供 MyBatis 3 / iBATIS 2 的 XML 导航、参数补全、映射检查、代码生成与 SQL 预览。当前目标平台为 IDEA 2026.1（261.*）、Java 21+；原生库按构建主机编译，CI 合并为包含 macOS aarch64/x86_64、Windows x86_64 和 Linux x86_64 原生库的统一插件 ZIP。
+MyBatis Assistant 是独立实现的 IntelliJ IDEA 插件，提供 MyBatis 3 / iBATIS 2 的 XML 导航、参数补全、映射检查、代码生成与 SQL 预览。当前完整验证平台为 IDEA 2026.3（263.*），兼容声明为 261–263.*；读取 263 SDK 需要 JDK 25 编译器，插件自身字节码保持 Java 21 目标。原生库按构建主机编译，CI 合并为包含 macOS aarch64/x86_64、Windows x86_64 和 Linux x86_64 原生库的统一插件 ZIP。
 
 `MyBatisCodeHelper-Pro/` 是用户提供的参考资源包。保留该目录；不把其中的程序或资源复制进发布包。当前版本的功能范围和限制以 README.md 与 docs/ 为准，不声称完整复刻原插件。
 
@@ -30,7 +30,7 @@ MyBatis Assistant 是独立实现的 IntelliJ IDEA 插件，提供 MyBatis 3 / i
 
 ## 验证与交付
 
-涉及核心行为：`python3 scripts/build.py --test`；涉及 IDEA 接入：再运行 `python3 scripts/test_ide.py`；发布包：`python3 scripts/verify_archive.py`。标准构建使用 `JAVA_HOME=/path/to/jdk21 ./gradlew --no-daemon buildPlugin`。
+涉及核心行为：`python3 scripts/build.py --test`；涉及 IDEA 接入：再运行 `python3 scripts/test_ide.py`；发布包：`python3 scripts/verify_archive.py`。标准构建使用 `JAVA_HOME=/path/to/jdk25 ./gradlew --no-daemon buildPlugin`；本地脚本按 SDK 版本选择编译器。
 
 测试应验证行为和兼容语义；旧动态 SQL 的关键分支用真实 iBATIS 运行时做测试参考，但不因此把旧运行时打包进插件。真实数据库验证需单独列出，不能把渲染通过写成业务 SQL 已验证。
 

@@ -32,6 +32,15 @@ public final class EditorIntegrationTest extends LightJavaCodeInsightFixtureTest
         XmlFile file=xml("<resultMap id='r' type='PERSON'><result column='id' property='id'/></resultMap>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
         assertEquals("sample.User",MapperModel.typeClass(file.getRootTag().findFirstSubTag("resultMap"),"PERSON").getQualifiedName());
     }
+    public void testXmlDeclarationValuesAreNotMapperAttributes(){
+        XmlFile file=(XmlFile)myFixture.configureByText(XmlFileType.INSTANCE,"<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-mapper.dtd\"><mapper namespace='sample.UserMapper'><select id='find'>SELECT #{user.name}</select></mapper>");
+        for(XmlAttributeValue value:PsiTreeUtil.findChildrenOfType(file,XmlAttributeValue.class))value.getReferences();
+        myFixture.enableInspections(new MapperInspection());myFixture.doHighlighting();
+    }
+    public void testCompletionInsideXmlDeclarationDoesNotCastParent(){
+        myFixture.configureByText(XmlFileType.INSTANCE,"<?xml version=\"1.0\" encoding=\"UT<caret>\"?><mapper namespace='sample.UserMapper'><select id='find'>SELECT 1</select></mapper>");
+        myFixture.completeBasic();
+    }
     public void testPackageAliasAndInvalidation(){
         PsiFile configuration=myFixture.addFileToProject("application.properties","mybatis.type-aliases-package=sample");
         XmlFile file=xml("<resultMap id='r' type='person'/>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());

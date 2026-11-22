@@ -15,7 +15,7 @@ public final class MapperModel {
     public static final Set<String> STATEMENTS=Set.of("select","insert","update","delete");
     private static final Set<String> LEGACY_STATEMENTS=Set.of("statement","procedure");
     private static final Set<String> SQL_ANNOTATIONS=Set.of("Select","Insert","Update","Delete","SelectProvider","InsertProvider","UpdateProvider","DeleteProvider");
-    public record Metadata(Map<String,List<XmlTag>> tags){}
+    public record Metadata(Map<String,List<XmlTag>> tags,Map<String,List<XmlTag>> selectsByResultMap){}
     private static final com.intellij.openapi.util.Key<CachedValue<List<SmartPsiElementPointer<XmlTag>>>> ROOTS_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.xml.roots");
     private static List<XmlTag> xmls(PsiClass cls){
         List<SmartPsiElementPointer<XmlTag>> pointers=CachedValuesManager.getManager(cls.getProject()).getCachedValue(cls,ROOTS_CACHE,()->CachedValueProvider.Result.create(
@@ -60,8 +60,15 @@ public final class MapperModel {
     public static Metadata metadata(XmlTag root){
         return CachedValuesManager.getCachedValue(root,()->{
             Map<String,List<XmlTag>> tags=new HashMap<>();
-            for(XmlTag t:root.getSubTags()) {String id=t.getAttributeValue("id");if(id!=null)tags.computeIfAbsent(localId(root,id),k->new ArrayList<>()).add(t);}
-            return CachedValueProvider.Result.create(new Metadata(tags),root.getContainingFile());
+            Map<String,List<XmlTag>> selects=new HashMap<>();
+            for(XmlTag t:root.getSubTags()) {
+                ProgressManager.checkCanceled();
+                String id=t.getAttributeValue("id");if(id!=null)tags.computeIfAbsent(localId(root,id),k->new ArrayList<>()).add(t);
+                String refs=t.getAttributeValue("resultMap");
+                if("select".equals(t.getName()) && refs!=null)for(String ref:refs.split("[,\\s]+"))if(!ref.isEmpty())selects.computeIfAbsent(ref,k->new ArrayList<>()).add(t);
+            }
+            tags.replaceAll((id,values)->List.copyOf(values));selects.replaceAll((id,values)->List.copyOf(values));
+            return CachedValueProvider.Result.create(new Metadata(Map.copyOf(tags),Map.copyOf(selects)),root.getContainingFile());
         });
     }
     public static List<XmlTag> xmls(Project project,String namespace){
@@ -117,10 +124,14 @@ public final class MapperModel {
         while(t!=null && !isStatement(t))t=t.getParentTag();return root(t)==null?null:t;
     }
     public static XmlTag definition(XmlTag context,String name,String kind){
+        return definition(context,name,kind,null);
+    }
+    static XmlTag definition(XmlTag context,String name,String kind,Map<String,List<XmlTag>> namespaces){
         XmlTag root=root(context);if(root==null || name==null)return null;
         for(XmlTag t:metadata(root).tags().getOrDefault(localId(root,name),List.of()))if(kind.equals(t.getName()))return t;
         int dot=name.lastIndexOf('.');String id=dot<0?name:name.substring(dot+1);
-        List<XmlTag> roots=dot<0?List.of(root):xmls(root.getProject(),name.substring(0,dot));
+        String namespace=dot<0?root.getAttributeValue("namespace"):name.substring(0,dot);
+        List<XmlTag> roots=namespace==null?List.of(root):namespaces==null?xmls(root.getProject(),namespace):namespaces.computeIfAbsent(namespace,key->xmls(root.getProject(),key));
         for(XmlTag r:roots)for(XmlTag t:metadata(r).tags().getOrDefault(localId(r,id),List.of()))if(kind.equals(t.getName()))return t;
         return null;
     }

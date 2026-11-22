@@ -1,7 +1,7 @@
 <idea-plugin require-restart="true">
   <id>dev.mybatis.assistant</id>
   <name>MyBatis Assistant (Rust)</name>
-  <version>0.5.1</version>
+  <version>0.5.6</version>
   <vendor>MyBatis Assistant Contributors</vendor>
   <description><![CDATA[
     Independent MyBatis development assistant with a lazy Rust parsing engine.
@@ -11,7 +11,7 @@
     Offline iBATIS 2 dynamic SQL evaluation with conditional tags, prepend rules and iterate.
     持久 namespace 索引，按需计算，后台生成，无轮询或常驻外部进程。
   ]]></description>
-  <idea-version since-build="261" until-build="261.*"/>
+  <idea-version since-build="261" until-build="263.*"/>
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.java</depends>
   <depends>com.intellij.modules.xml</depends>
@@ -26,6 +26,7 @@
     <supportsKotlinPluginMode supportsK2="true" supportsK1="false"/>
   </extensions>
   <extensions defaultExtensionNs="com.intellij">
+    <iconProvider implementation="dev.mybatis.assistant.ide.MapperIconProvider" order="first"/>
     <fileBasedIndex implementation="dev.mybatis.assistant.ide.MapperNamespaceIndex"/>
     <fileBasedIndex implementation="dev.mybatis.assistant.ide.TypeAliasIndex"/>
     <projectService serviceImplementation="dev.mybatis.assistant.ide.AssistantSettings"/>

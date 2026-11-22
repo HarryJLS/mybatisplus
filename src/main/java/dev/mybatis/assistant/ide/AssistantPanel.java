@@ -90,34 +90,25 @@ public final class AssistantPanel extends JPanel {
             PsiDocumentManager.getInstance(project).commitDocument(editor.getDocument());var file=PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
             int offset=editor.getCaretModel().getOffset();String json=params.getText(),requestedId=statementId.getText().trim();
             background("渲染 MyBatis 动态 SQL",render,()->{
-                String[] main=new String[2];List<String> related=new ArrayList<>();
-                ReadAction.run(()->{
+                MapperSnapshot.Input input=ReadAction.compute(()->{
                     if(file==null || !file.isValid())throw new IllegalArgumentException("XML 已关闭或无效");
                     XmlTag root=MapperModel.root(file);
                     if(root==null){
                         PsiMethod method=MapperLanguageSupport.findMethod(file.findElementAt(Math.min(offset,Math.max(0,file.getTextLength()-1))));
                         if(method==null || !MapperModel.annotated(method))throw new IllegalArgumentException("请打开 Mapper XML 或把光标放在 SQL 注解方法内");
-                        main[0]=AnnotationSql.mapperXml(method);main[1]=method.getName();return;
+                        return new MapperSnapshot.Input(AnnotationSql.mapperXml(method),method.getName(),json,List.of());
                     }
                     XmlTag statement=MapperModel.statement(file.findElementAt(Math.min(offset,Math.max(0,file.getTextLength()-1))));
                     String id=requestedId.isEmpty()?statement==null?null:statement.getAttributeValue("id"):requestedId;
                     if(id==null)throw new IllegalArgumentException("请把光标放在 select/insert/update/delete 内，或填写语句 id");
-                    main[0]=file.getText();main[1]=id;Set<String> seen=new HashSet<>();collectRelated(root,seen,related);
+                    return MapperSnapshot.capture(file,id,json);
                 });
-                return SqlRenderer.render(main[0],main[1],json,related).display();
+                return input.render().display();
             },result->{sqlOutput.setText(result);sqlStatus.setText("已渲染当前参数分支；未连接数据库。");});
         });
         sqlOutput.setEditable(false);JPanel controls=new JPanel(new FlowLayout(FlowLayout.LEFT));controls.add(render);controls.add(new JLabel("语句 id（可选）"));controls.add(statementId);controls.add(copy(sqlOutput));
         JPanel parameterInput=new JPanel(new BorderLayout());parameterInput.add(new JLabel("JSON 参数：支持当前 XML 或常量 SQL 注解；iBATIS 也支持数组、标量和 null"),BorderLayout.NORTH);parameterInput.add(new JBScrollPane(params),BorderLayout.CENTER);
         JPanel panel=new JPanel(new BorderLayout());panel.add(controls,BorderLayout.NORTH);panel.add(split(parameterInput,new JBScrollPane(sqlOutput)),BorderLayout.CENTER);panel.add(sqlStatus,BorderLayout.SOUTH);return panel;
-    }
-    private static void collectRelated(XmlTag root,Set<String> seen,List<String> xml){
-        String namespace=root.getAttributeValue("namespace");if(!seen.add(namespace))return;if(seen.size()>64)throw new IllegalArgumentException("引用的 Mapper 超过 64 个，请缩小预览范围");
-        for(XmlTag include:PsiTreeUtil.findChildrenOfType(root,XmlTag.class))if("include".equals(include.getName())){
-            String ref=include.getAttributeValue("refid");if(ref==null || !ref.contains(".") || ref.contains("${"))continue;
-            String ns=ref.substring(0,ref.lastIndexOf('.'));if(seen.contains(ns))continue;
-            for(XmlTag other:MapperModel.xmls(root.getProject(),ns)){xml.add(other.getContainingFile().getText());collectRelated(other,seen,xml);}
-        }
     }
     private <T> void background(String title,JButton button,Callable<T> work,java.util.function.Consumer<T> success){
         button.setEnabled(false);new Task.Backgroundable(project,title,true){

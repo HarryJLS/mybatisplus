@@ -23,8 +23,9 @@ final class PreviewSafety {
             else if(c=='"')quoted=true;else if(c=='[' || c=='{'){if(++depth>64)throw new IllegalArgumentException("JSON 参数嵌套超过 64 层");}else if(c==']' || c=='}')depth--;
         }
     }
-    static void script(org.w3c.dom.Node node,JsonElement json)throws OgnlException{
-        Input input=new Input();json(json,input,0);inspect(node,input,0);estimate(node,input,0);
+    static void script(org.w3c.dom.Node node,JsonElement json)throws OgnlException{script(node,json,new PreviewExpressions(()->{}));}
+    static void script(org.w3c.dom.Node node,JsonElement json,PreviewExpressions expressions)throws OgnlException{
+        Input input=new Input();json(json,input,0);inspect(node,input,0,expressions);estimate(node,input,0,expressions);
     }
     private static void json(JsonElement value,Input input,int depth){
         if(depth>64 || ++input.nodes>100000)throw new IllegalArgumentException("JSON 参数超过节点上限");
@@ -35,23 +36,23 @@ final class PreviewSafety {
         }
     }
     private static void number(BigDecimal number){if(number.precision()>1000 || Math.abs((long)number.scale())>1000)throw new IllegalArgumentException("预览数值精度或 scale 超过 1000");}
-    private static void inspect(org.w3c.dom.Node node,Input input,int depth)throws OgnlException{
+    private static void inspect(org.w3c.dom.Node node,Input input,int depth,PreviewExpressions expressions)throws OgnlException{
         if(depth>64)throw new IllegalArgumentException("动态 SQL 嵌套超过 64 层");
         if(node instanceof Element element){
             String tag=element.getTagName();
-            if(Set.of("if","when").contains(tag))expression(element.getAttribute("test"),input);
-            if(tag.equals("foreach"))expression(element.getAttribute("collection"),input);
-            if(tag.equals("bind"))expression(element.getAttribute("value"),input);
+            if(Set.of("if","when").contains(tag))expression(element.getAttribute("test"),input,expressions);
+            if(tag.equals("foreach"))expression(element.getAttribute("collection"),input,expressions);
+            if(tag.equals("bind"))expression(element.getAttribute("value"),input,expressions);
         }else if(node.getNodeType()==org.w3c.dom.Node.TEXT_NODE || node.getNodeType()==org.w3c.dom.Node.CDATA_SECTION_NODE){
             Matcher tokens=TOKENS.matcher(node.getNodeValue());while(tokens.find()){
-                if(tokens.group(1).equals("$"))expression(tokens.group(2),input);
+                if(tokens.group(1).equals("$"))expression(tokens.group(2),input,expressions);
                 else if(tokens.group(2).matches("(?s).*,\\s*(?:javaType|typeHandler)\\s*=.*"))throw new IllegalArgumentException("离线预览不加载自定义 javaType/typeHandler");
             }
         }
-        for(org.w3c.dom.Node child=node.getFirstChild();child!=null;child=child.getNextSibling())inspect(child,input,depth+1);
+        for(org.w3c.dom.Node child=node.getFirstChild();child!=null;child=child.getNextSibling())inspect(child,input,depth+1,expressions);
     }
-    private static int expression(String text,Input input)throws OgnlException{
-        int nodes=expression(OgnlSyntax.parse(text),input);if(input.valueSize*nodes>MAX_OUTPUT)throw new IllegalArgumentException("表达式的保守求值上界超过 4 MiB");return nodes;
+    private static int expression(String text,Input input,PreviewExpressions expressions)throws OgnlException{
+        int nodes=expression(expressions.parse(text),input);if(input.valueSize*nodes>MAX_OUTPUT)throw new IllegalArgumentException("表达式的保守求值上界超过 4 MiB");return nodes;
     }
     private static int expression(org.apache.ibatis.ognl.Node node,Input input){
         String kind=node.getClass().getSimpleName();
@@ -63,16 +64,16 @@ final class PreviewSafety {
         if(kind.equals("ASTList") || kind.equals("ASTMap"))input.iterable=Math.max(input.iterable,node.jjtGetNumChildren());
         int count=1;for(int i=0;i<node.jjtGetNumChildren();i++)count+=expression(node.jjtGetChild(i),input);return count;
     }
-    private static Cost estimate(org.w3c.dom.Node node,Input input,int depth)throws OgnlException{
+    private static Cost estimate(org.w3c.dom.Node node,Input input,int depth,PreviewExpressions expressions)throws OgnlException{
         long chars=0,steps=1,params=0;
         if(node.getNodeType()==org.w3c.dom.Node.TEXT_NODE || node.getNodeType()==org.w3c.dom.Node.CDATA_SECTION_NODE){
-            String text=node.getNodeValue();chars=text.length();Matcher tokens=TOKENS.matcher(text);while(tokens.find())if(tokens.group(1).equals("#"))params++;else chars+=input.valueSize*expression(tokens.group(2),input);
+            String text=node.getNodeValue();chars=text.length();Matcher tokens=TOKENS.matcher(text);while(tokens.find())if(tokens.group(1).equals("#"))params++;else chars+=input.valueSize*expression(tokens.group(2),input,expressions);
         }
         if(node instanceof Element element){
             String tag=element.getTagName();String key=Set.of("if","when").contains(tag)?"test":tag.equals("foreach")?"collection":tag.equals("bind")?"value":null;
-            if(key!=null)steps+=expression(element.getAttribute(key),input);
+            if(key!=null)steps+=expression(element.getAttribute(key),input,expressions);
         }
-        for(org.w3c.dom.Node child=node.getFirstChild();child!=null;child=child.getNextSibling()){Cost c=estimate(child,input,depth+1);chars+=c.chars();steps+=c.steps();params+=c.params();}
+        for(org.w3c.dom.Node child=node.getFirstChild();child!=null;child=child.getNextSibling()){Cost c=estimate(child,input,depth+1,expressions);chars+=c.chars();steps+=c.steps();params+=c.params();}
         if(node instanceof Element element && element.getTagName().equals("foreach")){
             chars=boundedMultiply(chars+element.getAttribute("separator").length(),input.iterable)+element.getAttribute("open").length()+element.getAttribute("close").length();steps=boundedMultiply(steps,input.iterable);params=boundedMultiply(params,input.iterable);
         }

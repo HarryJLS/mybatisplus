@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Build against a local IDEA SDK without downloading another IDE or a Gradle daemon."""
-import argparse, hashlib, os, pathlib, platform, re, shutil, subprocess, sys, urllib.request, zipfile, xml.etree.ElementTree as ET
+import argparse, hashlib, json, os, pathlib, platform, re, shutil, subprocess, sys, urllib.request, zipfile, xml.etree.ElementTree as ET
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 BUILD=ROOT/'build'
 def sdk_jars(idea,integrations=True):
     jars=list((idea/'lib').glob('*.jar'))+list((idea/'plugins/java/lib').glob('*.jar'))+list((idea/'plugins/java/lib/modules').glob('*.jar'))
+    # 263 moved XML PSI out of the platform JARs into its bundled plugin.
+    jars.extend((idea/'plugins/xml-plugin/lib').rglob('*.jar'))
     if integrations:
         for name in ['DatabaseTools','Spring','Kotlin']:
             jars.extend((idea/'plugins'/name/'lib').rglob('*.jar'))
@@ -31,6 +33,10 @@ def main():
     args=parser.parse_args();idea=pathlib.Path(args.idea_home)
     if (idea/'Contents').is_dir():idea=idea/'Contents'
     if not (idea/'lib').is_dir():sys.exit('IDEA SDK directory not found; set IDEA_HOME or --idea-home')
+    info=idea/'Resources/product-info.json'
+    if not info.exists():info=idea/'product-info.json'
+    sdk_build=json.loads(info.read_text())['buildNumber'].split('.')[0]
+    minimum_compiler=25 if int(sdk_build.rsplit('-',1)[-1])>=263 else 21
     candidates=[]
     if os.environ.get('JAVA_HOME'):candidates.append(pathlib.Path(os.environ['JAVA_HOME'])/'bin')
     candidates.extend([idea/'jbr/Contents/Home/bin',idea/'jbr/bin'])
@@ -40,8 +46,8 @@ def main():
         if not (candidate/'javac').is_file():continue
         version=subprocess.run([str(candidate/'javac'),'-version'],capture_output=True,text=True).stdout
         match=re.search(r'javac (\d+)',version)
-        if match and int(match[1])>=21:java=candidate;break
-    if java is None:sys.exit('JDK 21+ not found; set JAVA_HOME to a JDK 21 or newer installation')
+        if match and int(match[1])>=minimum_compiler:java=candidate;break
+    if java is None:sys.exit(f'JDK {minimum_compiler}+ required for this IDEA SDK; set JAVA_HOME accordingly')
     deps=BUILD/'deps';deps.mkdir(parents=True,exist_ok=True)
     for name,url,digest in DEPENDENCIES:
         path=deps/name

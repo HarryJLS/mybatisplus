@@ -1,16 +1,16 @@
 # MyBatis Assistant（Rust）
 
-独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前版本 **0.5.1**。
+独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前开发版本 **0.5.6**（已提交、未发布）。
 
 Java 接入 IDEA 的语法树、索引和界面；Rust JNI 按需处理 DDL 与日志；SQL 预览根据 XML 根元素分派到 MyBatis 引擎或独立 iBATIS 求值器。原生库在第一次使用文本工具时加载，不创建常驻外部进程。
 
-支持 **IDEA 2026.1（261.*）、Java 21+**。自动构建发布一个统一插件 ZIP，Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64 共用同一文件；插件按当前系统自动选择内置原生库。项目架构和协作要求见 [AGENTS.md](AGENTS.md)。
+兼容声明为 **IDEA 2026.1–2026.3（261–263.*）**，本次完整验证 IDEA 2026.3（263.7307.200）；插件字节码目标为 Java 21。IDEA 2026.3 自带 JBR 25，读取其 SDK API 需要 JDK 25 编译器。自动构建发布一个统一插件 ZIP，Windows x86_64、macOS Apple Silicon / Intel 和 Linux x86_64 共用同一文件；插件按当前系统自动选择内置原生库。项目架构和协作要求见 [AGENTS.md](AGENTS.md)。
 
 ## 安装与入口
 
 IDEA → Settings → Plugins → 齿轮 → Install Plugin from Disk，选择：
 
-[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。选择 **`mybatis-assistant-0.5.1.zip`**，Windows 和 Mac 使用同一个文件，无需解压。GitHub 自动附加的 `Source code (zip)` 是源码包，不能直接安装。
+[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。当前已发布版本为 **`mybatis-assistant-0.5.1.zip`**，Windows 和 Mac 使用同一个文件，无需解压。0.5.6 尚未发布；本次 macOS Apple Silicon 本地构建为 `build/distributions/mybatis-assistant-0.5.6-macos-aarch64.zip`，只包含本机原生库。GitHub 自动附加的 `Source code (zip)` 是源码包，不能直接安装。
 
 Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和归档检查结果。支持上述四个系统/处理器组合；Windows ARM64、Linux ARM64 等组合尚无内置原生库。
 
@@ -21,6 +21,7 @@ Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和
 | 功能 | 说明 |
 | --- | --- |
 | 接口 / XML 导航 | MyBatis mapper、iBATIS sqlMap；namespace 全名、唯一简称、显式映射、无 namespace 文件名 |
+| Mapper 鱼形图标 | 项目树与编辑器标签的 Mapper XML、Java/Kotlin Mapper 接口；接口名、方法名、XML namespace / 语句 id 旁的鱼形图标可点击跳转 |
 | iBATIS DAO 导航 | 用户点击后查找实现、同类辅助方法、静态 SQL id 和常量拼接 |
 | SQL API 引用 | SqlMapClient、Spring SqlMapClientTemplate、SqlSession 的完整语句字符串 |
 | 参数与映射补全 | @Param、集合、索引、嵌套属性；resultMap、refid；旧 #property# / $property$ 与动态 property |
@@ -39,13 +40,14 @@ Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和
 | Spring | 可选 MapperScan/MapperScans Bean 识别、扫描配置检查；标准 Boot 自动配置中的 @Mapper 支持 |
 | 代码生成 | DDL → 实体/Mapper/XML（MyBatis / MyBatis-Plus）；方法名 → 简单查询；实体 → DDL；预览后创建文件，不覆盖已有文件 |
 | SQL 日志还原 | Preparing / Parameters 配对、转义、null、数值和线程交错检查 |
-| MyBatis SQL 预览 | 真实 MyBatis 3.5.19 处理 if、where、set、trim、choose、foreach、bind、include |
+| MyBatis SQL 预览 | MyBatis 3.5.19 SQL 节点与 OGNL，使用单次请求的表达式缓存处理 if、where、set、trim、choose、foreach、bind、include |
 | iBATIS SQL 预览 | 独立处理 dynamic、旧条件标签、prepend、removeFirstPrepend、iterate、include、内联参数与静态 parameterMap |
 
 预览显示预编译 SQL 和有序参数，**不连接数据库，也不代表业务 SQL 已验证**。数据库执行使用独立入口。离线 MyBatis 求值限定 JSON 和常用无副作用方法，拒绝 Java 静态成员、反射、构造器、自定义 TypeHandler 及无法受限展开的脚本；iBATIS 使用独立求值器。尚未完整覆盖原插件，完整 SQL/OGNL 类型语义、全部 Kotlin/Spring 配置和自定义代码模板仍有边界。详见 [功能范围](docs/features.md) 与 [运行接入说明](docs/runtime.md)。
 
 ## 使用
 
+- **鱼形图标与跳转**：Mapper XML / iBATIS sqlMap，以及通过 XML 关联或 `@Mapper` 识别的接口显示原创鱼形图标，XML 为红色、接口为蓝色，支持浅色/深色主题。跳转标记使用目标类型的颜色。点击接口或方法左侧的小鱼跳到 XML；点击 XML namespace / 语句 id 左侧的小鱼跳回接口或方法，多个目标显示选择列表。Settings → Tools → MyBatis Assistant 可关闭“显示 Mapper / XML 跳转图标”，文件图标仍显示。
 - **生成 CRUD**：粘贴单表 CREATE TABLE，选择包名、框架、方言和目标模块，先预览再写入。
 - **日志转 SQL**：粘贴同一线程、完整配对的 MyBatis 日志，点击还原。
 - **动态 SQL 预览**：保持 mapper / sqlMap 为当前编辑器，光标放在语句内，输入 JSON 后预览；也可填写语句 id。
@@ -63,7 +65,7 @@ Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和
 
 ## 构建与验证
 
-需要 Cargo/Rust、Python 3、JDK 21+ 与本地 IDEA SDK。
+需要 Cargo/Rust、Python 3、JDK 25 与本地 IDEA 2026.3 SDK；本地脚本按 SDK 版本选择编译器，仍使用 `--release 21` 生成插件字节码。
 
 ```sh
 python3 scripts/build.py --test --bench
@@ -79,26 +81,68 @@ python3 scripts/verify_archive.py
 标准 IntelliJ Platform Gradle 工程：
 
 ```sh
-JAVA_HOME=/path/to/jdk21 ./gradlew --no-daemon buildPlugin
-JAVA_HOME=/path/to/jdk21 ./gradlew coreTest
-JAVA_HOME=/path/to/jdk21 ./gradlew runIde
+JAVA_HOME=/path/to/jdk25 ./gradlew --no-daemon buildPlugin
+JAVA_HOME=/path/to/jdk25 ./gradlew coreTest
+JAVA_HOME=/path/to/jdk25 ./gradlew runIde
 ```
 
 ### GitHub 自动构建
 
 源码仓库：[HarryJLS/mybatisplus](https://github.com/HarryJLS/mybatisplus)，主分支为 `main`。向 `main` 推送代码会触发 [Build and release plugin](https://github.com/HarryJLS/mybatisplus/actions/workflows/build-plugin.yml)；也可在 Actions 手动运行。Pull Request 执行测试和打包，成功发布只在 `main` 上进行。
 
-流水线下载固定 **IDEA 2026.1.4** SDK，使用 JDK 21、Rust stable，在四个平台运行 Rust 测试、Java/JNI/MyBatis 核心断言和归档/注册实现/原生库架构校验。四个平台构建成功后，合并为 **`mybatis-assistant-版本.zip`**，校验共享 Java 代码/依赖一致和全部原生库架构，再在四个平台从这个最终 ZIP 加载原生引擎并测试日志/DDL。Actions 的 **`mybatis-assistant`** 附件保留统一安装包、SHA256 和报告 30 天；最终 ZIP 的四平台测试全部通过后，自动创建 Release `v插件版本-build.流水线编号` 并上传这三个文件。普通 push 不必修改版本或创建 tag；编号让同一插件版本的不同构建也能分别下载，失败的构建不会发布 Release。
+流水线下载固定 **IDEA 2026.3** SDK，使用 JDK 25、Rust stable，在四个平台运行 Rust 测试、Java/JNI/MyBatis 核心断言和归档/注册实现/原生库架构校验。四个平台构建成功后，合并为 **`mybatis-assistant-版本.zip`**，校验共享 Java 代码/依赖一致和全部原生库架构，再在四个平台从这个最终 ZIP 加载原生引擎并测试日志/DDL。Actions 的 **`mybatis-assistant`** 附件保留统一安装包、SHA256 和报告 30 天；最终 ZIP 的四平台测试全部通过后，自动创建 Release `v插件版本-build.流水线编号` 并上传这三个文件。普通 push 不必修改版本或创建 tag；编号让同一插件版本的不同构建也能分别下载，失败的构建不会发布 Release。
 
 IDEA 界面集成测试、可选 Kotlin/Spring/Database 专测及 H2/iBATIS 运行时对照仍使用上面的本地命令。自动打包通过不代表已验证全部 IDE 操作或真实生产数据库。发布的统一 ZIP 可直接用于已覆盖的系统/处理器组合；其他组合需另行编译原生库。
 
-本地默认使用已安装的 IDEA；需要下载 SDK 时使用 `./gradlew --no-daemon -PideaVersion=2026.1.4 coreTest buildPlugin`。Windows 可用 `gradlew.bat`。单台机器的本地构建输出在 `build/distributions/`，带平台后缀，仅包含本机原生库；CI 的 `platform-build-*` 是合并所用中间附件。统一安装包位于 `build/universal-artifacts/`，命名不带平台后缀。发布任务使用本次流水线的 GitHub 临时令牌，无需设置个人令牌或 Marketplace 密钥。
+本地默认使用已安装的 IDEA；需要下载 SDK 时使用 `./gradlew --no-daemon -PideaVersion=2026.3 coreTest buildPlugin`。Windows 可用 `gradlew.bat`。单台机器的本地构建输出在 `build/distributions/`，带平台后缀，仅包含本机原生库；CI 的 `platform-build-*` 是合并所用中间附件。统一安装包位于 `build/universal-artifacts/`，命名不带平台后缀。发布任务使用本次流水线的 GitHub 临时令牌，无需设置个人令牌或 Marketplace 密钥。
 
 性能设计和样例数据见 [性能报告](docs/performance.md)。`MyBatisCodeHelper-Pro/` 为本地参考资源约定目录，不纳入源码上传或发布包，当前源码和构建不依赖它；结构分析见 [参考资源说明](docs/reference-analysis.md)。
 
 ## 版本记录
 
 日期采用 Asia/Shanghai。0.1.0–0.5.0 的功能最初在本地开发，没有独立的历史 Git commit；2026-11-21 首次上传以当前完整源码快照建立 Git 历史。历史条目的“未提交”表示该历史版本没有独立提交，不据此虚构提交记录。
+
+### 0.5.6 — 双色鱼形图标与 XML 导航去重
+
+- **更新日期：2026-11-22；提交日期：2026-11-22。**
+- 已实现：按用户截图重新绘制深色鱼身与彩色鱼头的原创 SVG；XML 文件用红色，Java/Kotlin Mapper 接口用蓝色，导航标记按目标类型配色（接口→XML 红色，XML→接口蓝色），含浅色/深色主题版本。
+- 已修复：namespace / 语句 id 仅在属性内容的首个叶节点生成鱼形导航标记，过滤起止引号造成的两个重复菜单项；单引号、双引号采用相同规则。
+- 验证：18 项 Rust 测试、171 项核心断言、82 项 IDEA 集成测试、10 项可选扩展测试及 macOS aarch64 安装包的 43 个注册实现/归档检查通过。新增完整 XML 叶节点收集回归，验证每个属性仅一个标记、单双引号无标记、双向导航目标和目标图标；四种 SVG 经 IDEA 渲染器检查及浅色/深色图片检查。兼容声明保持 261–263.*，本次实际平台为 IDEA 2026.3（263.7307.200）/ macOS aarch64，较早平台未重跑完整测试。
+
+### 0.5.5 — Mapper 文件与导航鱼形图标
+
+- **更新日期：2026-11-22；提交日期：2026-11-22。**
+- 已实现：原创 16×16 鱼形 SVG 及深色主题版本，统一 Mapper XML / iBATIS sqlMap 文件、Java/Kotlin Mapper 接口与编辑器跳转标记；通过 IDEA IconProvider 接入项目树、文件标签与类展示。
+- 已实现：XML 根 namespace 旁增加跳回 Mapper 接口的鱼形图标；保留接口→XML、方法↔语句、多目标选择与 iBATIS DAO 点击后查找实现。导航开关沿用现有设置，文件图标独立显示。
+- 兼容限制：接口通过 `@Mapper` 或现有 XML namespace / 显式映射识别，普通 XML 和仅以 Mapper 结尾的接口不改图标；索引构建期间接口图标使用默认展示，Kotlin 需启用可选 K2 扩展。图标独立绘制，未复制参考插件资源。
+- 验证：18 项 Rust 测试、171 项核心断言、81 项 IDEA 集成测试及 10 项可选扩展测试通过；macOS aarch64 安装包的 43 个注册实现及归档检查通过。用户已安装并确认鱼形图标显示；后续发现 XML 引号节点产生重复菜单项，在 0.5.6 修复。兼容声明保持 261–263.*，本次实际平台为 IDEA 2026.3。
+
+### 0.5.4 — 同 namespace 分文件预览与按需 include
+
+- **更新日期：2026-11-22；提交日期：2026-11-22。**
+- 修复真实项目发现的同一 namespace 分布于多个 XML 时，本地 refid 无法读取其他文件 SQL 片段的问题；按持久 namespace 索引定位，编辑期间不扫描全项目。
+- GUI、数据库入口与 MCP 共用 MapperSnapshot，只遍历当前语句实际引用的片段；按文件去重，按请求复用 namespace 查询，保留文件数量、输入、深度与步数上限。
+- 构建：IntelliJ Platform Gradle 插件更新到 2.20.1、Gradle 分发更新到 9.2.1 并固定 SHA256，使用 JDK 25 读取 263 SDK、保持 Java 21 字节码目标；CI 改为 IDEA 2026.3 / JDK 25。
+- 验证：18 项 Rust 测试、171 项核心断言、74 项 IDEA 集成测试、9 项可选扩展测试、JDK 25 标准 Gradle `coreTest buildPlugin` 和归档检查通过；新增同 namespace 嵌套片段、按需 include 和 MyBatis 跨 namespace 裸 refid 调用方语义测试。已通过 IDEA 官方启动安装队列更新并由重启日志确认加载 0.5.4，临时界面探针已移除。现场复测 80 个接口、372 个方法全部解析；79 个预览中 68 个成功，原先 4 个同 namespace 片段失败案例全部通过，其余 11 项明确拒绝业务方法求值。10000 次不同表达式预览静态缓存为 0 → 0，真实 IDEA 中 JNI 日志/DDL 与懒加载检查通过；本次 5 分钟压力采样和 2 分钟 GC 后观测详见性能报告，未扩大为数天验证。
+
+### 0.5.3 — IDEA 2026.3 接入与预览缓存
+
+- **更新日期：2026-11-21；提交日期：2026-11-22。**
+- 已修复：XML 声明值的父节点不是普通 XmlAttribute 时直接跳过，避免在带 XML 声明的 Mapper 高亮/补全中抛出 ClassCastException。
+- 已实现：IDEA 2026.3（263.7307.200）的独立 XML SDK 模块依赖、按 SDK 版本隔离的测试依赖和测试配置、完整测试插件加载。兼容声明保留 261 下限；本次完整接入验证为 263，较早平台未重跑本版本完整测试。
+- 已实现：MyBatis 预览表达式改为单次渲染拥有的语法缓存（最多 256 条/256 Ki 字符，单条仍受语法树上限约束），沿用真实 MyBatis SQL 节点与 foreach 参数规则；不再将用户表达式存入 MyBatis 静态缓存，补充后台任务取消检查。
+- 2026-11-22 复测：18 项 Rust 测试、171 项核心断言、71 项 IDEA 集成测试和 9 项可选扩展测试通过；核心测试用真实 MyBatis 对照并验证 2000 次不同表达式预览不增加静态缓存。已安装到 IDEA 2026.3 并由启动日志确认加载。真实业务项目 80 个 XML、372 个方法的解析通过，2 轮各 10000 次预览静态缓存均为 0；完整 IDEA 进程已采样 20 分钟，范围和剩余限制见性能报告。
+
+### 0.5.2 — 编辑与文本工具性能优化
+
+- **更新日期：2026-11-21；提交日期：2026-11-22。**
+- 已实现：类型别名由同模块 XML 共享字符串缓存，按 Java/Kotlin 类型、配置索引、项目根和设置变化失效；普通 SQL 编辑不再重建别名表。
+- 已实现：类属性表附着于类 PSI 共享，保留继承字段/getter 与泛型替换，复用声明智能指针；XML 检查仅在存在表达式或占位符时读取参数模型，OGNL 编辑语法树按属性缓存。
+- 已实现：Mapper 元数据共享 resultMap 的 SELECT 反向引用；静态投影/列缓存追踪实际 include 文件，并在缺失片段对应的索引变化后重试；展开前检查输出长度并补充取消检查。
+- 已实现：Rust DDL 逐段借用输入，常规无注释输入避免复制和全量小写转换，字段超限提前退出；日志结果直接写入一个输出字符串。
+- 兼容限制：仍声明 IDEA 2026.1（261.*），本次未扩展到 2026.2/2026.3；MyBatis 预览仍使用真实引擎及其表达式缓存，未声称已解决长期预览缓存累积或完成真实项目 CPU/内存对照。
+- 验证：本地 IDEA 2026.1.4 / macOS arm64，18 项 Rust 测试、152 项核心断言、69 项 IDEA 集成测试及 9 项实际 Kotlin/Spring/Database 扩展测试通过；含新增缓存共享、泛型、Java/Kotlin 修改失效、跨文件 include 与缺失片段重试测试。macOS 安装包的 41 个注册实现/归档检查和从 ZIP 加载 JNI 的日志/DDL 测试通过。
+- 实测：与变更前 HEAD 的独立 Rust release 对照，4 列 DDL 7 轮中位耗时由 0.785 降至 0.652 微秒/次；1000 列 DDL 累计分配请求字节由 253908 降至 134248（约减少 47%），100 组日志由 53346 降至 39460（约减少 26%）。详见 [性能报告](docs/performance.md)；不代表完整 IDEA 的 CPU/常驻内存，也未验证本次云端四平台安装包或生产数据库。
 
 ### 0.5.1
 

@@ -44,7 +44,7 @@ def verify(archive, target):
             assert plugin.findtext('id') == 'dev.mybatis.assistant'
             assert plugin.findtext('version') == version
             assert plugin.find('idea-version').get('since-build') == '261'
-            assert plugin.find('idea-version').get('until-build') == '261.*'
+            assert plugin.find('idea-version').get('until-build') == '263.*'
             implementations = []
             descriptors = [plugin]
             for dependency in plugin.findall('depends'):

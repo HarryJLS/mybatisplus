@@ -1,6 +1,9 @@
 package dev.mybatis.assistant.ide;
 
 import com.intellij.openapi.module.ModuleUtilCore;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectRootModificationTracker;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.util.Key;
@@ -23,20 +26,21 @@ final class TypeAliases {
     }
     static Map<String,String> names(PsiElement owner) {
         if (DumbService.isDumb(owner.getProject())) return BUILTINS;
-        PsiFile file = owner.getContainingFile();
-        return CachedValuesManager.getManager(file.getProject()).getCachedValue(file, CACHE, () ->
-            CachedValueProvider.Result.create(load(file), file, PsiModificationTracker.MODIFICATION_COUNT,
-                file.getProject().getService(AssistantSettings.class),
-                (com.intellij.openapi.util.ModificationTracker) () -> FileBasedIndex.getInstance().getIndexModificationStamp(TypeAliasIndex.NAME, file.getProject())), false);
+        Project project=owner.getProject();
+        Module module=ModuleUtilCore.findModuleForPsiElement(owner);
+        // A module/project owns this string-only cache; the provider retains no caller PSI.
+        return CachedValuesManager.getManager(project).getCachedValue(module==null?project:module, CACHE, () ->
+            CachedValueProvider.Result.create(load(project,module), ModelDependencies.types(project),
+                ProjectRootModificationTracker.getInstance(project), project.getService(AssistantSettings.class),
+                (com.intellij.openapi.util.ModificationTracker) () -> FileBasedIndex.getInstance().getIndexModificationStamp(TypeAliasIndex.NAME, project)), false);
     }
     static String resolve(PsiElement context, String alias) {
         return alias == null ? null : names(context).get(alias.toLowerCase(Locale.ROOT));
     }
-    private static Map<String,String> load(PsiElement owner) {
+    private static Map<String,String> load(Project project,Module module) {
         Map<String,Set<String>> candidates = new TreeMap<>();
         BUILTINS.forEach((key,value) -> add(candidates,key,value));
-        var module = ModuleUtilCore.findModuleForPsiElement(owner);
-        var scope = module == null ? GlobalSearchScope.projectScope(owner.getProject()) : GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module);
+        var scope = module == null ? GlobalSearchScope.projectScope(project) : GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module);
         Set<String> packages = new LinkedHashSet<>();
         FileBasedIndex index = FileBasedIndex.getInstance();
         // Fetch only indexed configuration files with alias/package entries.
@@ -44,17 +48,17 @@ final class TypeAliases {
         for (var file : index.getContainingFiles(TypeAliasIndex.NAME,TypeAliasIndex.CONFIG,scope)) {
             ProgressManager.checkCanceled();
             if (++configurations > 128) break;
-            index.getFileData(TypeAliasIndex.NAME,file,owner.getProject()).forEach((key,value) -> {
+            index.getFileData(TypeAliasIndex.NAME,file,project).forEach((key,value) -> {
                 if (key.equals(TypeAliasIndex.PACKAGES)) packages.addAll(Arrays.asList(value.split(";")));
                 else if (key.startsWith("#implicit:")) {
-                    PsiClass cls=JavaPsiFacade.getInstance(owner.getProject()).findClass(value,scope);
+                    PsiClass cls=JavaPsiFacade.getInstance(project).findClass(value,scope);
                     String alias=value.substring(value.lastIndexOf('.')+1);
                     if(cls!=null)alias=classAlias(cls);
                     add(candidates,alias,value);
                 }else if (!key.equals(TypeAliasIndex.CONFIG)) add(candidates,key,value);
             });
         }
-        var settings = AssistantSettings.get(owner.getProject());
+        var settings = AssistantSettings.get(project);
         for (String value : settings.typeAliasPackages.split("[,;\\s]+")) if (!value.isBlank()) packages.add(value);
         for (String line : settings.typeAliasBindings.split("\\R")) {
             int split = line.indexOf('=');
@@ -66,7 +70,7 @@ final class TypeAliases {
         while (!queue.isEmpty() && visited.size() < 256 && classes < 4096) {
             ProgressManager.checkCanceled();
             String name = queue.removeFirst(); if (!visited.add(name)) continue;
-            PsiPackage pkg = JavaPsiFacade.getInstance(owner.getProject()).findPackage(name);
+            PsiPackage pkg = JavaPsiFacade.getInstance(project).findPackage(name);
             if (pkg == null) continue;
             for (PsiClass cls : pkg.getClasses(scope)) {
                 if (++classes > 4096) break;

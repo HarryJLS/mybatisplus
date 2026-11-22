@@ -1,11 +1,12 @@
 plugins {
     java
-    id("org.jetbrains.intellij.platform") version "2.10.4"
+    id("org.jetbrains.intellij.platform") version "2.20.1"
 }
 
 group = "dev.mybatis.assistant"
-version = "0.5.1"
-java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+version = "0.5.6"
+// 263 SDK classes use Java 25; keep our own bytecode target at Java 21.
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 repositories {
     mavenCentral()
@@ -22,6 +23,16 @@ dependencies {
             local(providers.gradleProperty("ideaHome").orElse("/Applications/IntelliJ IDEA.app/Contents"))
         }
         bundledPlugin("com.intellij.java")
+        // XML became a separate bundled plugin in 263; older SDKs expose it in the platform.
+        val xmlIsSeparate = if (sdkVersion.isPresent) {
+            val parts = sdkVersion.get().split(".")
+            parts[0].toInt() > 2026 || parts[0] == "2026" && parts[1].toInt() >= 3
+        } else {
+            val home = file(providers.gradleProperty("ideaHome").orElse("/Applications/IntelliJ IDEA.app/Contents").get())
+            val info = listOf(home.resolve("Resources/product-info.json"), home.resolve("product-info.json")).firstOrNull { it.exists() }
+            info != null && Regex("\"buildNumber\"\\s*:\\s*\"(?:[A-Z]+-)?(\\d+)").find(info.readText())?.groupValues?.get(1)?.toInt()?.let { it >= 263 } == true
+        }
+        if (xmlIsSeparate) bundledPlugin("com.intellij.xml")
         bundledPlugin("com.intellij.database")
         bundledPlugin("com.intellij.spring")
         bundledPlugin("org.jetbrains.kotlin")
@@ -32,7 +43,7 @@ dependencies {
     testImplementation("org.apache.ibatis:ibatis-sqlmap:2.3.4.726")
 }
 intellijPlatform {
-    pluginConfiguration { ideaVersion { sinceBuild = "261"; untilBuild = "261.*" } }
+    pluginConfiguration { ideaVersion { sinceBuild = "261"; untilBuild = "263.*" } }
     buildSearchableOptions = false
 }
 val buildNative by tasks.registering(Exec::class) {
@@ -53,7 +64,15 @@ tasks.processResources {
     from("native/target/release/$libraryName") { into("native/$platform-$architecture") }
     from(files("LICENSE", "THIRD_PARTY_NOTICES.md")) { into("META-INF") }
 }
-tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8"; options.release.set(21) }
+// The 263 distribution splits platform/API classes into many module JARs.
+// Compile-only SDK inputs stay out of the installation ZIP.
+val sdkCompileJars = providers.provider {
+    val sdk = intellijPlatform.platformPath
+    listOf("lib", "plugins/java/lib", "plugins/xml-plugin/lib", "plugins/DatabaseTools/lib", "plugins/Spring/lib", "plugins/Kotlin/lib")
+        .flatMap { folder -> fileTree(sdk.resolve(folder).toFile()) { include("**/*.jar") }.files }
+}
+dependencies { compileOnly(files(sdkCompileJars)) }
 tasks.register<JavaExec>("coreTest") {
     dependsOn(tasks.testClasses, buildNative)
     classpath = sourceSets.test.get().runtimeClasspath
@@ -62,5 +81,6 @@ tasks.register<JavaExec>("coreTest") {
         fileTree(intellijPlatform.platformPath.resolve("lib").toFile()) { include("*.jar") }
     })
     mainClass = "dev.mybatis.assistant.core.CoreTests"
-    jvmArgs("-ea", "-Dmybatis.assistant.native=${file("native/target/release/$libraryName").absolutePath}")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+    jvmArgs("-ea", "--enable-native-access=ALL-UNNAMED", "-Dmybatis.assistant.native=${file("native/target/release/$libraryName").absolutePath}")
 }
