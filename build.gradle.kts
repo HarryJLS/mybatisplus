@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "dev.mybatis.assistant"
-version = "0.5.6"
+version = "0.5.8"
 // 263 SDK classes use Java 25; keep our own bytecode target at Java 21.
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 

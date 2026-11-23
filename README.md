@@ -1,6 +1,6 @@
 # MyBatis Assistant（Rust）
 
-独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前开发版本 **0.5.6**（已提交、未发布）。
+独立实现的 IntelliJ IDEA 插件，辅助 MyBatis 3 / iBATIS 2 开发。当前开发版本 **0.5.8**（已提交、未发布）。
 
 Java 接入 IDEA 的语法树、索引和界面；Rust JNI 按需处理 DDL 与日志；SQL 预览根据 XML 根元素分派到 MyBatis 引擎或独立 iBATIS 求值器。原生库在第一次使用文本工具时加载，不创建常驻外部进程。
 
@@ -10,7 +10,7 @@ Java 接入 IDEA 的语法树、索引和界面；Rust JNI 按需处理 DDL 与�
 
 IDEA → Settings → Plugins → 齿轮 → Install Plugin from Disk，选择：
 
-[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。当前已发布版本为 **`mybatis-assistant-0.5.1.zip`**，Windows 和 Mac 使用同一个文件，无需解压。0.5.6 尚未发布；本次 macOS Apple Silicon 本地构建为 `build/distributions/mybatis-assistant-0.5.6-macos-aarch64.zip`，只包含本机原生库。GitHub 自动附加的 `Source code (zip)` 是源码包，不能直接安装。
+[GitHub Releases 安装包](https://github.com/HarryJLS/mybatisplus/releases/latest)。当前已发布版本为 **`mybatis-assistant-0.5.1.zip`**，Windows 和 Mac 使用同一个文件，无需解压。0.5.8 尚未发布；本次 macOS Apple Silicon 本地构建为 `build/distributions/mybatis-assistant-0.5.8-macos-aarch64.zip`，只包含本机原生库。GitHub 自动附加的 `Source code (zip)` 是源码包，不能直接安装。
 
 Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和归档检查结果。支持上述四个系统/处理器组合；Windows ARM64、Linux ARM64 等组合尚无内置原生库。
 
@@ -27,17 +27,18 @@ Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和
 | 参数与映射补全 | @Param、集合、索引、嵌套属性；resultMap、refid；旧 #property# / $property$ 与动态 property |
 | 基础检查 | 重复 id、缺失 MyBatis 方法/语句、无效引用/属性/参数；iBATIS 不套用 MyBatis 代理约束 |
 | 类型别名 | 内置别名、配置 XML、常量 properties/YAML 包名、包内 @Alias；模块范围索引查询，歧义不自动选类 |
-| OGNL 编辑 | 真实语法解析、已知属性/方法数量检查、零参数方法补全、String 与单字符比较提示；编辑检查不求值 |
+| OGNL 编辑 | 语法、属性、方法数量/已知参数类型检查；泛型返回值链、Map 索引、foreach、顺序 bind；编辑检查不求值 |
 | resultMap 列检查 | 静态 SELECT 字段/别名、include 展开、重复列、内联嵌套 columnPrefix；动态投影与通配符跳过缺失列判断 |
 | 参数和映射重构 | @Param 绑定名、sql/resultMap/parameterMap id、foreach item/index、bind name；保持 namespace 前缀与局部作用域 |
 | 注解 SQL | 常量 SQL 的参数补全、跳转、检查和重构；常量数组及 script 注解可离线预览，Provider 不求值 |
-| SQL 编辑 | XML/注解的基础关键字补全；安装 IDEA Database 时为静态 SQL 注入 SQL 语言，使用平台提示与格式化 |
+| SQL 编辑 | XML 动态标签各文本位置的 SQL 上下文、关键字/列提示、参数及标签检查；可选 IDEA Database SQL 语言接入 |
 | 控制台日志 | 可开启 Parameters 行的还原链接，按线程配对；点击才解析，不自动执行 SQL |
 | 数据库执行 | 独立 JDBC 入口：查询、事务回滚试跑、预览后确认提交；参数化单语句、结果和超时上限 |
 | 数据源与表结构 | 手动 JDBC 或可选 IDEA Database 的常规连接配置；读取表、字段、主键，密码使用 PasswordSafe |
 | MCP | IDEA 内置 HTTP 服务上的 8 个工具，项目令牌和本机访问；默认关闭，数据库访问单独开启，不提供提交 |
 | Kotlin | 可选 K2 接入，Mapper/XML 导航、参数/属性解析、常量 SQL 注解预览、直接字符串 @Param 绑定重构 |
 | Spring | 可选 MapperScan/MapperScans Bean 识别、扫描配置检查；标准 Boot 自动配置中的 @Mapper 支持 |
+| 映射与测试生成 | SELECT → resultMap（含嵌套映射）；接口方法 → 独立 MyBatis JUnit SQL/参数断言与显式开启的回滚测试 |
 | 代码生成 | DDL → 实体/Mapper/XML（MyBatis / MyBatis-Plus）；方法名 → 简单查询；实体 → DDL；预览后创建文件，不覆盖已有文件 |
 | SQL 日志还原 | Preparing / Parameters 配对、转义、null、数值和线程交错检查 |
 | MyBatis SQL 预览 | MyBatis 3.5.19 SQL 节点与 OGNL，使用单次请求的表达式缓存处理 if、where、set、trim、choose、foreach、bind、include |
@@ -47,7 +48,9 @@ Release 中的 `SHA256SUMS.txt` 与 `verification.json` 提供完整性校验和
 
 ## 使用
 
-- **鱼形图标与跳转**：Mapper XML / iBATIS sqlMap，以及通过 XML 关联或 `@Mapper` 识别的接口显示原创鱼形图标，XML 为红色、接口为蓝色，支持浅色/深色主题。跳转标记使用目标类型的颜色。点击接口或方法左侧的小鱼跳到 XML；点击 XML namespace / 语句 id 左侧的小鱼跳回接口或方法，多个目标显示选择列表。Settings → Tools → MyBatis Assistant 可关闭“显示 Mapper / XML 跳转图标”，文件图标仍显示。
+- **鱼形图标与跳转**：Mapper XML / iBATIS sqlMap，以及通过 XML 关联或 `@Mapper` 识别的接口显示原创鱼形图标，XML 为红色、接口为蓝色，支持浅色/深色主题。跳转标记使用目标类型的颜色。点击接口或方法左侧的小鱼跳到 XML；点击 XML namespace / 语句 id 左侧的小鱼跳回接口或方法，多个目标显示选择列表。Settings → Tools → MyBatis Assistant 可关闭“显示 Mapper / XML 跳转图标及操作按钮”，文件图标仍显示。
+- **生成 resultMap**：点击 SELECT 开始行左侧的绿色操作按钮 → 从 SELECT 生成 resultMap；先为表达式设唯一别名，使用实体 resultType，预览可手工补充未匹配列。
+- **快速测试/testcase**：点击 Java/Kotlin Mapper 方法名左侧的绿色按钮，或 SELECT 左侧操作菜单的“测试 Mapper SQL / 生成 testcase”；编辑 JSON、测试分支后预览并创建 JUnit 测试与配置。默认只断言渲染 SQL/参数；数据库测试需显式启用 `-Dmybatis.test.database=true` 并配置 `mybatis.test.jdbc.url/driver/user/password`，在测试数据库执行并回滚。
 - **生成 CRUD**：粘贴单表 CREATE TABLE，选择包名、框架、方言和目标模块，先预览再写入。
 - **日志转 SQL**：粘贴同一线程、完整配对的 MyBatis 日志，点击还原。
 - **动态 SQL 预览**：保持 mapper / sqlMap 为当前编辑器，光标放在语句内，输入 JSON 后预览；也可填写语句 id。
@@ -101,6 +104,25 @@ IDEA 界面集成测试、可选 Kotlin/Spring/Database 专测及 H2/iBATIS 运�
 ## 版本记录
 
 日期采用 Asia/Shanghai。0.1.0–0.5.0 的功能最初在本地开发，没有独立的历史 Git commit；2026-11-21 首次上传以当前完整源码快照建立 Git 历史。历史条目的“未提交”表示该历史版本没有独立提交，不据此虚构提交记录。
+
+### 0.5.8 — SELECT / Mapper 方法左侧操作按钮
+
+- **更新日期：2026-11-24；提交日期：2026-11-24。**
+- 已实现：SELECT 开始标签名旁增加绿色操作按钮，点击打开生成 resultMap / 测试 SQL / 生成 testcase 菜单；没有可解析接口方法时只提供 resultMap 操作。
+- 已实现：已有 MyBatis XML 语句的 Java/Kotlin Mapper 方法名旁增加绿色测试按钮，直接打开参数测试与 testcase 窗口；保留鱼形双向导航和 Alt+Enter 快捷入口。
+- 每个声明只在名称叶节点生成一次按钮，过滤 XML 属性、结束标签及普通方法；iBATIS 不显示 MyBatis 生成按钮。点击使用 SmartPsiElementPointer 获取当前目标，生成/测试仍复用后台任务和预览流程，不在高亮时生成代码或扫描项目。
+- 同步设置开关名称、使用说明、开发版本及安装包地址。
+- 验证：`python3 scripts/build.py --test`（18 项 Rust 测试、187 项核心断言及 4 个生成的 JUnit 测试编译/真实 MyBatis 对照）、`python3 scripts/test_ide.py`（111 项）、`python3 scripts/test_ide.py --integrations`（13 项）及 `python3 scripts/verify_archive.py`（50 个注册实现与归档/原生库检查）通过。新增 SELECT 开始行/属性/结束标签去重、菜单操作、Java/Kotlin 方法按钮、设置开关、失效目标禁用及原鱼形导航保留验证。实际平台为 IDEA 2026.3（263.7307.200）/ macOS aarch64，较早平台未重跑本版完整验证；本次按钮变更未执行用户数据库操作。
+
+### 0.5.7 — 所选 SQL 编辑、映射与测试能力完善
+
+- **更新日期：2026-11-22；提交日期：2026-11-24。** 随 0.5.8 同次提交；0.5.7 没有独立 Git 提交。
+- 动态 SQL 编辑：为 XML 各文本位置构造有界 SQL 上下文，处理 where/set/trim/choose/foreach/include/selectKey 与复用 sql 片段；where 前缀覆盖规则支持空格、换行与 Tab；可选 IDEA Database 提供 SQL 语言提示与静态语法检查，条件不求值，不表示所有运行分支或数据库语义已验证。
+- 参数与 OGNL：补充 #{} 选项/引号及注释内绑定检查、${} 表达式检查、动态标签结构检查；解析泛型方法返回值、Map 索引键与 foreach 键/值，按声明顺序推导 bind 类型，处理 include 及条件分支声明，未引用片段/其他语句不泄漏变量；复杂重载与条件绑定的未知类型保留边界。
+- resultMap：新增变化文件驱动的引用索引，按引用解析分文件/跨 namespace/extends/嵌套 columnPrefix；提示未显式映射的 SELECT 列；SELECT 上 Alt+Enter 可生成含 association/collection 的 resultMap，歧义列在可编辑预览中明确列出，通配符/动态投影拒绝自动生成。
+- if test：支持选中 SQL 或光标所在 AND/OR 条件行，生成嵌套空值保护；数字索引先检查数组长度或 List 大小，Map 字符串键保持完整。
+- testcase：接口方法 Alt+Enter 打开参数测试窗口，按 JSON 渲染后生成独立 MyBatis 配置与 JUnit 4/5 测试（SQL 和有序参数断言）；可显式开启数据库回滚测试。配置读取原 Mapper 资源，不启动 Spring，不保存数据库密码，不覆盖已有文件；数据库测试需项目提供 JDBC 驱动、连接、有效数据和业务断言。
+- 验证：`python3 scripts/build.py --test`（18 项 Rust 测试、187 项核心断言及 4 个生成的 JUnit 4/5 SELECT/UPDATE 测试源码编译/真实 MyBatis SQL 与绑定对照）、`python3 scripts/test_ide.py`（106 项）、`python3 scripts/test_ide.py --integrations`（12 项）、`python3 scripts/test_database.py`（30 项真实 H2 JDBC/事务断言及生成测试的查询/更新回滚验证）、`python3 scripts/verify_archive.py`（47 个注册实现及归档/原生库检查）通过。实际平台为 IDEA 2026.3（263.7307.200）/ macOS aarch64；较早平台未重跑本版完整验证。未执行用户数据库或生产数据库验证，未将离线渲染写成业务 SQL 已验证。
 
 ### 0.5.6 — 双色鱼形图标与 XML 导航去重
 

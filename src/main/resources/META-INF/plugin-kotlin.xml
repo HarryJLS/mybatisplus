@@ -5,6 +5,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <iconProvider implementation="dev.mybatis.assistant.ide.kotlin.KotlinMapperIconProvider" order="first"/>
     <codeInsight.lineMarkerProvider language="kotlin" implementationClass="dev.mybatis.assistant.ide.kotlin.KotlinMapperGutter"/>
+    <codeInsight.lineMarkerProvider language="kotlin" implementationClass="dev.mybatis.assistant.ide.kotlin.KotlinMapperActionsGutter"/>
     <localInspection language="kotlin" shortName="MyBatisAssistantKotlin" displayName="Kotlin Mapper 映射检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.kotlin.KotlinMapperInspection"/>
   </extensions>
 </idea-plugin>

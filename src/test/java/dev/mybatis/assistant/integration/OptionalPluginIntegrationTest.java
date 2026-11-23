@@ -39,6 +39,10 @@ public final class OptionalPluginIntegrationTest extends LightJavaCodeInsightFix
         PsiMethod method=new KotlinMapperSupport().methods(file).getFirst();assertEquals("SELECT #{id}",new KotlinMapperSupport().annotationSql(method));
         var input=MapperSnapshot.of(file,"find","{\"id\":3}");assertEquals(List.of(new java.math.BigDecimal(3)),input.render().parameters());
     }
+    public void testKotlinMapperGetsOneTestcaseButtonOnFunctionName(){
+        KtFile file=(KtFile)myFixture.addFileToProject("sample/ButtonMapper.kt","package sample\ninterface ButtonMapper { fun find(): Long; fun absent(): Long }\n");myFixture.addFileToProject("mapper/Buttons.xml","<mapper namespace='sample.ButtonMapper'><select id='find'>SELECT 1</select></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        List<com.intellij.codeInsight.daemon.LineMarkerInfo<?>> buttons=new ArrayList<>();new dev.mybatis.assistant.ide.kotlin.KotlinMapperActionsGutter().collectSlowLineMarkers(Arrays.asList(com.intellij.psi.util.PsiTreeUtil.collectElements(file,e->e.getFirstChild()==null)),buttons);assertEquals(1,buttons.size());assertEquals("find",buttons.getFirst().getElement().getText());assertNotNull(buttons.getFirst().getNavigationHandler());assertSame(com.intellij.icons.AllIcons.Actions.Execute,buttons.getFirst().getIcon());
+    }
     public void testKotlinPropertyEditInvalidatesJavaMemberView(){
         PsiFile file=myFixture.addFileToProject("sample/MutableItem.kt","package sample\ndata class MutableItem(val name: String)\n");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
         PsiClass cls=MapperModel.classByName(getProject(),"sample.MutableItem");assertNotNull(cls);
@@ -77,6 +81,18 @@ public final class OptionalPluginIntegrationTest extends LightJavaCodeInsightFix
         var bean=SpringImplicitBean.create("MyBatis Assistant",mapper,"springMapper");assertEquals("springMapper",bean.getBeanName());assertEquals("sample.SpringMapper",bean.getBeanType().getCanonicalText());
     }
     public void testOptionalDatabaseProviderRegistered(){assertFalse(DatabaseProvider.EP.getExtensionList().isEmpty());assertTrue(PluginManagerCore.getPlugin(PluginId.getId("com.intellij.database")).isEnabled());}
+    public void testDatabaseSqlInjectionInsideDynamicBranches(){
+        XmlFile file=(XmlFile)myFixture.addFileToProject("src/main/resources/mapper/Injected.xml","<mapper namespace='sample.Injected'><select id='find'>SELECT id FROM users <where><choose><when test='name != null'>AND name=#{name}</when><otherwise>AND id=#{id}</otherwise></choose></where></select></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        for(var text:com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(file,com.intellij.psi.xml.XmlText.class))if(text.getValue().contains("AND name=") || text.getValue().contains("AND id=")){
+            var injected=com.intellij.lang.injection.InjectedLanguageManager.getInstance(getProject()).getInjectedPsiFiles(text);assertNotNull(injected);assertFalse(injected.isEmpty());String sql=injected.getFirst().first.getText();assertTrue(injected.getFirst().first.getLanguage().isKindOf(com.intellij.lang.Language.findLanguageByID("SQL")));assertTrue(sql,sql.contains("FROM users"));assertTrue(sql,sql.contains("WHERE"));assertFalse(sql,sql.contains("#{"));
+        }
+    }
+    public void testDatabaseDynamicSqlInjectionPreservesXmlEscapesAndCdata(){
+        XmlFile file=(XmlFile)myFixture.addFileToProject("src/main/resources/mapper/Escapes.xml","<mapper namespace='sample.Escapes'><select id='find'>SELECT id FROM users <where><if test='id != null'><![CDATA[AND id < #{id}]]></if><if test='name != null'>AND name &lt;&gt; #{name}</if></where></select></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());
+        for(var text:com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(file,com.intellij.psi.xml.XmlText.class))if(text.getValue().contains("#{")){
+            var manager=com.intellij.lang.injection.InjectedLanguageManager.getInstance(getProject());var injected=manager.getInjectedPsiFiles(text);assertNotNull(injected);assertFalse(injected.isEmpty());String sql=manager.getUnescapedText(injected.getFirst().first);assertTrue(sql,sql.contains("id < ?"));assertTrue(sql+"; host="+text.getValue(),sql.contains("name <> ?"));assertFalse(sql,sql.contains("CDATA"));
+        }
+    }
     public void testKotlinBindingRenamePreservesSourceVariable(){
         PsiFile file=myFixture.addFileToProject("sample/RenameMapper.kt","package sample\nimport org.apache.ibatis.annotations.Param as SqlParam\ninterface RenameMapper { fun find(@SqlParam(\"value\") input: Long): Long }\n");
         PsiFile xml=myFixture.addFileToProject("mapper/RenameMapper.xml","<mapper namespace='sample.RenameMapper'><select id='find'>SELECT #{value}</select></mapper>");IndexingTestUtil.waitUntilIndexesAreReady(getProject());

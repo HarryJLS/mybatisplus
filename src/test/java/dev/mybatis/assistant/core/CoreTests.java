@@ -12,7 +12,7 @@ public final class CoreTests {
     private static void fails(Throwing runnable){checks++;try{runnable.run();}catch(Exception|LinkageError e){return;}throw new AssertionError("expected failure");}
     @FunctionalInterface interface Throwing{void run()throws Exception;}
     public static void main(String[] args)throws Exception{
-        nativeAndGeneration();queries();dynamic();index();jniBenchmark();LegacyRendererTests.main(new String[0]);EditorCoreTests.main(new String[0]);RuntimeCoreTests.main(new String[0]);PreviewSafetyTests.main(new String[0]);PreviewCacheTests.main(new String[0]);
+        nativeAndGeneration();queries();dynamic();index();jniBenchmark();LegacyRendererTests.main(new String[0]);EditorCoreTests.main(new String[0]);GeneratedMapperTestTests.main(new String[0]);RuntimeCoreTests.main(new String[0]);PreviewSafetyTests.main(new String[0]);PreviewCacheTests.main(new String[0]);
         System.out.println("PASS: "+checks+" Java/JNI/MyBatis assertions");
     }
     private static void nativeAndGeneration()throws Exception{

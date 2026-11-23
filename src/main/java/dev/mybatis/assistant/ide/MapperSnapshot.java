@@ -37,8 +37,15 @@ public final class MapperSnapshot {
         return ReadAction.compute(()->{
             PsiElement element=file.findElementAt(Math.min(offset,Math.max(0,file.getTextLength()-1)));XmlTag statement=MapperModel.statement(element);
             if(statement!=null)return capture(file,statement.getAttributeValue("id"),json);
-            PsiMethod method=MapperLanguageSupport.findMethod(element);if(method==null)throw new IllegalArgumentException("请将光标放在语句或普通注解 Mapper 方法内");return capture(file,method.getName(),json);
+            PsiMethod method=MapperLanguageSupport.findMethod(element);if(method==null)throw new IllegalArgumentException("请将光标放在语句或 Mapper 方法内");return forMethod(method,json);
         });
+    }
+    public static Input forMethod(PsiMethod method,String json){
+        List<XmlTag> statements=MapperModel.statements(method);
+        if(statements.size()==1)return capture(statements.getFirst().getContainingFile(),statements.getFirst().getAttributeValue("id"),json);
+        if(statements.size()>1)throw new IllegalArgumentException("方法关联多个 XML/databaseId 语句，请从具体 XML 语句测试");
+        if(MapperModel.annotated(method))return new Input(AnnotationSql.mapperXml(method),method.getName(),json,List.of());
+        throw new IllegalArgumentException("此方法没有可测试的 XML 或常量 SQL 注解");
     }
     static Input capture(PsiFile file,String id,String json){
         if(DumbService.isDumb(file.getProject()))throw new IllegalArgumentException("IDEA 正在更新索引，请稍后重试");

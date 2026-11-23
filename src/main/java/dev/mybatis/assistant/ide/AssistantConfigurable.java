@@ -17,7 +17,7 @@ public final class AssistantConfigurable implements Configurable {
     @Override public String getDisplayName(){return "MyBatis Assistant";}
     @Override public JComponent createComponent(){
         panel=new JPanel();panel.setLayout(new BoxLayout(panel,BoxLayout.Y_AXIS));
-        completion=new JCheckBox("启用参数与映射补全");inspections=new JCheckBox("启用基础映射检查");gutter=new JCheckBox("显示 Mapper / XML 跳转图标");
+        completion=new JCheckBox("启用参数与映射补全");inspections=new JCheckBox("启用基础映射检查");gutter=new JCheckBox("显示 Mapper / XML 跳转图标及操作按钮");
         actual=new JCheckBox("MyBatis 使用 Java 参数名（项目编译需启用 -parameters；否则建议使用 @Param）");dollar=new JCheckBox("提示 ${} / $…$ 直接拼接 SQL");
         for(JCheckBox b:new JCheckBox[]{completion,inspections,gutter,actual,dollar}){b.setAlignmentX(Component.LEFT_ALIGNMENT);panel.add(b);}
         panel.add(new JLabel("代码生成默认包名"));pkg=new JTextField(30);pkg.setMaximumSize(new Dimension(600,30));pkg.setAlignmentX(Component.LEFT_ALIGNMENT);panel.add(pkg);

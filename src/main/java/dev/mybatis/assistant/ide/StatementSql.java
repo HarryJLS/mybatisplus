@@ -33,39 +33,45 @@ final class StatementSql {
     static SqlProjection.Result columns(XmlTag resultMap) {
         return CachedValuesManager.getManager(resultMap.getProject()).getCachedValue(resultMap,COLUMNS_CACHE,()->{
             Set<PsiFile> files=new LinkedHashSet<>();files.add(resultMap.getContainingFile());
-            SqlProjection.Result result=loadColumns(resultMap,files);
+            SqlProjection.Result result=loadColumns(resultMap,files,new HashSet<>(),0);
             List<Object> dependencies=new ArrayList<>(files);
             dependencies.add(ModelDependencies.namespaces(resultMap.getProject()));
             dependencies.add(ModelDependencies.types(resultMap.getProject()));
+            dependencies.add(MapperUsageIndex.tracker(resultMap.getProject()));
             dependencies.add(ProjectRootModificationTracker.getInstance(resultMap.getProject()));
             dependencies.add(resultMap.getProject().getService(AssistantSettings.class));
             return CachedValueProvider.Result.create(result,dependencies.toArray());
         },false);
     }
-    private static SqlProjection.Result loadColumns(XmlTag resultMap,Set<PsiFile> files) {
-        XmlTag owner=MapperModel.root(resultMap);
-        Set<XmlTag> roots = new LinkedHashSet<>(List.of(owner));
-        PsiClass mapper = MapperModel.mapperClass(owner);
-        if (mapper != null) roots.addAll(MapperModel.mapperRoots(mapper));
-        String id=MapperModel.localId(owner,resultMap.getAttributeValue("id"));
-        if(id==null)return new SqlProjection.Result(List.of(),false,"resultMap 没有 id");
-        Set<String> names=new LinkedHashSet<>(List.of(id));
-        String namespace=owner.getAttributeValue("namespace");if(namespace!=null)names.add(namespace+"."+id);
-        List<String> columns = new ArrayList<>();boolean complete = true, found = false;
-        for (XmlTag root : roots) {
-            ProgressManager.checkCanceled();files.add(root.getContainingFile());
-            Set<XmlTag> candidates=new LinkedHashSet<>();
-            for(String name:names)candidates.addAll(MapperModel.metadata(root).selectsByResultMap().getOrDefault(name,List.of()));
-            for(XmlTag statement:candidates) {
-                String refs=statement.getAttributeValue("resultMap");
-                for(String ref:refs.split("[,\\s]+"))if(MapperModel.definition(statement,ref,"resultMap")==resultMap){
-                    found=true;Projection projection=data(statement);
-                    for(var pointer:projection.files()){PsiFile file=pointer.getElement();if(file!=null)files.add(file);}
-                    columns.addAll(projection.result().columns());complete &= projection.result().complete();break;
+    private static SqlProjection.Result loadColumns(XmlTag resultMap,Set<PsiFile> files,Set<XmlTag> stack,int depth) {
+        if(depth>32 || !stack.add(resultMap))return new SqlProjection.Result(List.of(),false,"嵌套 resultMap 循环或超出上限");
+        try {
+            XmlTag owner=MapperModel.root(resultMap);String id=resultMap.getAttributeValue("id"),namespace=owner.getAttributeValue("namespace");
+            if(id==null)return new SqlProjection.Result(List.of(),false,"resultMap 没有 id");
+            Set<XmlTag> roots=new LinkedHashSet<>(List.of(owner));
+            if(namespace!=null){roots.addAll(MapperModel.xmls(owner.getProject(),namespace));roots.addAll(MapperUsageIndex.roots(resultMap,"map",namespace+"."+id));}
+            List<String> columns=new ArrayList<>();boolean found=false,complete=true;int steps=0;
+            for(XmlTag root:roots){
+                files.add(root.getContainingFile());if(files.size()>128)return new SqlProjection.Result(List.copyOf(columns),false,"映射依赖文件超过上限");
+                List<XmlTag> tags=new ArrayList<>(List.of(root));
+                for(int i=0;i<tags.size();i++){
+                    XmlTag tag=tags.get(i);ProgressManager.checkCanceled();if(++steps>4096)return new SqlProjection.Result(List.copyOf(columns),false,"映射引用节点超过上限");tags.addAll(Arrays.asList(tag.getSubTags()));
+                    String refs=tag.getAttributeValue(tag.getName().equals("resultMap")?"extends":"resultMap");if(refs==null)continue;
+                    for(String ref:refs.split("[,\\s]+"))if(MapperModel.definition(tag,ref,"resultMap")==resultMap){
+                        SqlProjection.Result projection;String prefix="";
+                        if(tag.getName().equals("select")){
+                            Projection data=data(tag);projection=data.result();for(var pointer:data.files()){PsiFile file=pointer.getElement();if(file!=null)files.add(file);}
+                        }else{
+                            XmlTag outer=tag.getName().equals("resultMap")?tag:tag.getParentTag();while(outer!=null && !outer.getName().equals("resultMap"))outer=outer.getParentTag();if(outer==null)continue;
+                            projection=loadColumns(outer,files,stack,depth+1);
+                            if(tag!=outer)prefix=columnPrefix(tag)+Objects.requireNonNullElse(tag.getAttributeValue("columnPrefix"),"");
+                        }
+                        found=true;complete&=projection.complete();for(String column:projection.columns())if(column.startsWith(prefix))columns.add(column.substring(prefix.length()));
+                    }
                 }
             }
-        }
-        return new SqlProjection.Result(List.copyOf(new LinkedHashSet<>(columns)),found && complete,found ? "部分 SELECT 列无法静态解析" : "没有本 Mapper 内引用此 resultMap 的 SELECT");
+            return new SqlProjection.Result(List.copyOf(new LinkedHashSet<>(columns)),found && complete,found?"部分 SELECT 列无法静态解析":"没有明确引用此 resultMap 的 SELECT");
+        }finally{stack.remove(resultMap);}
     }
     static String columnPrefix(XmlTag field){
         String prefix="";

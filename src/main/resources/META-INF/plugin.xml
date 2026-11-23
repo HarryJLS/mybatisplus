@@ -1,7 +1,7 @@
 <idea-plugin require-restart="true">
   <id>dev.mybatis.assistant</id>
   <name>MyBatis Assistant (Rust)</name>
-  <version>0.5.6</version>
+  <version>0.5.8</version>
   <vendor>MyBatis Assistant Contributors</vendor>
   <description><![CDATA[
     Independent MyBatis development assistant with a lazy Rust parsing engine.
@@ -28,6 +28,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <iconProvider implementation="dev.mybatis.assistant.ide.MapperIconProvider" order="first"/>
     <fileBasedIndex implementation="dev.mybatis.assistant.ide.MapperNamespaceIndex"/>
+    <fileBasedIndex implementation="dev.mybatis.assistant.ide.MapperUsageIndex"/>
     <fileBasedIndex implementation="dev.mybatis.assistant.ide.TypeAliasIndex"/>
     <projectService serviceImplementation="dev.mybatis.assistant.ide.AssistantSettings"/>
     <projectService serviceImplementation="dev.mybatis.assistant.ide.McpProjectService"/>
@@ -44,13 +45,18 @@
     <referencesSearch implementation="dev.mybatis.assistant.ide.PlaceholderReferenceSearch"/>
     <consoleFilterProvider implementation="dev.mybatis.assistant.ide.SqlConsoleFilterProvider"/>
     <completion.contributor language="XML" implementationClass="dev.mybatis.assistant.ide.MapperCompletion"/>
+    <injectedFormattingOptionsProvider implementation="dev.mybatis.assistant.ide.MapperSqlFormatting"/>
     <codeInsight.lineMarkerProvider language="JAVA" implementationClass="dev.mybatis.assistant.ide.MapperGutter"/>
     <codeInsight.lineMarkerProvider language="XML" implementationClass="dev.mybatis.assistant.ide.MapperGutter"/>
+    <codeInsight.lineMarkerProvider language="JAVA" implementationClass="dev.mybatis.assistant.ide.MapperActionsGutter"/>
+    <codeInsight.lineMarkerProvider language="XML" implementationClass="dev.mybatis.assistant.ide.MapperActionsGutter"/>
     <localInspection language="XML" shortName="MyBatisAssistantXml" displayName="MyBatis 映射与参数检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.MapperInspection"/>
     <localInspection language="JAVA" shortName="MyBatisAssistantMethod" displayName="Mapper 方法缺少 SQL" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.MapperMethodInspection"/>
     <localInspection language="JAVA" shortName="MyBatisAssistantAnnotation" displayName="MyBatis 注解 SQL 参数检查" groupName="MyBatis Assistant" enabledByDefault="true" level="WARNING" implementationClass="dev.mybatis.assistant.ide.AnnotationInspection"/>
     <intentionAction><className>dev.mybatis.assistant.ide.GenerateStatementIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
     <intentionAction><className>dev.mybatis.assistant.ide.WrapIfIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
+    <intentionAction><className>dev.mybatis.assistant.ide.GenerateResultMapIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
+    <intentionAction><className>dev.mybatis.assistant.ide.GenerateMapperTestIntention</className><category>MyBatis Assistant</category><skipBeforeAfter>true</skipBeforeAfter></intentionAction>
     <toolWindow id="MyBatis Assistant" anchor="right" factoryClass="dev.mybatis.assistant.ide.AssistantToolWindow" icon="/icons/assistant.svg"/>
   </extensions>
   <actions>

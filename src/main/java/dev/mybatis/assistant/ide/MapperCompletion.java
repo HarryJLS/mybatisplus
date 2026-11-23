@@ -34,10 +34,13 @@ public final class MapperCompletion extends CompletionContributor {
             }
             if(name.equals("refid") || name.equals("resultMap") || name.equals("extends") || name.equals("parameterMap")){
                 String kind=name.equals("refid")?"sql":name.equals("parameterMap")?"parameterMap":"resultMap";XmlTag root=MapperModel.root(attr);
-                for(var entry:MapperModel.metadata(root).tags().entrySet())if(entry.getValue().stream().anyMatch(t->kind.equals(t.getName())))result.addElement(LookupElementBuilder.create(entry.getKey()).withTypeText(kind));
+                String token=before.substring(Math.max(before.lastIndexOf(','),before.lastIndexOf(' '))+1);int dot=token.lastIndexOf('.');
+                List<XmlTag> roots=dot<0?MapperModel.xmls(pos.getProject(),root.getAttributeValue("namespace")):MapperModel.xmls(pos.getProject(),token.substring(0,dot));
+                Set<XmlTag> candidates=new LinkedHashSet<>(roots);if(dot<0)candidates.add(root);CompletionResultSet target=result.withPrefixMatcher(dot<0?token:token.substring(dot+1));
+                for(XmlTag candidate:candidates)for(var entry:MapperModel.metadata(candidate).tags().entrySet())if(entry.getValue().stream().anyMatch(t->kind.equals(t.getName())))target.addElement(LookupElementBuilder.create(entry.getKey()).withTypeText(kind));
                 return;
             }
-            if(name.equals("property")){if(MapperModel.isLegacy(MapperModel.root(tag)) && MapperReferences.parameterProperty(tag))parameters(pos,before,result);else add(result,ParameterModel.properties(MappingTypes.ownerType(tag)));return;}
+            if(name.equals("property")){if(MapperModel.isLegacy(MapperModel.root(tag)) && MapperReferences.parameterProperty(tag))parameters(pos,before,result);else{int dot=before.lastIndexOf('.');var owner=MappingTypes.ownerType(tag);var nested=dot<0?null:MappingTypes.property(owner,before.substring(0,dot));add(result.withPrefixMatcher(dot<0?before:before.substring(dot+1)),ParameterModel.properties(dot<0?owner:nested==null?null:nested.type()));}return;}
             if(name.equals("compareProperty") && MapperModel.isLegacy(MapperModel.root(tag))){parameters(pos,before,result);return;}
             if(Set.of("test","collection","keyProperty").contains(name) || name.equals("value") && "bind".equals(tag.getName())){parameters(pos,before,result);methods(pos,before,result);return;}
         }
@@ -52,9 +55,14 @@ public final class MapperCompletion extends CompletionContributor {
             int open=Math.max(before.lastIndexOf("#{"),before.lastIndexOf("${"));
             if(open>=0 && before.indexOf('}',open)<0){
                 String inside=before.substring(open+2);if(inside.contains(",")){
-                    if(inside.matches("(?s).*jdbcType\\s*=\\s*[A-Z]*$"))for(var type:org.apache.ibatis.type.JdbcType.values())result.addElement(LookupElementBuilder.create(type.name()));
+                    String option=inside.substring(inside.lastIndexOf(',')+1).stripLeading();int equal=option.indexOf('=');
+                    CompletionResultSet target=result.withPrefixMatcher(equal<0?option:option.substring(equal+1).stripLeading());
+                    if(equal<0)for(String key:dev.mybatis.assistant.core.SqlParameters.OPTIONS)target.addElement(LookupElementBuilder.create(key+"="));
+                    else if(option.substring(0,equal).strip().equals("jdbcType"))for(var type:org.apache.ibatis.type.JdbcType.values())target.addElement(LookupElementBuilder.create(type.name()));
+                    else if(option.substring(0,equal).strip().equals("mode"))for(String mode:List.of("IN","OUT","INOUT"))target.addElement(LookupElementBuilder.create(mode));
+                    else if(option.substring(0,equal).strip().equals("javaType"))TypeAliases.names(pos).forEach((alias,type)->target.addElement(LookupElementBuilder.create(alias).withTypeText(type)));
                     return;
-                }parameters(pos,inside,result);return;
+                }parameters(pos,inside,result);if(before.charAt(open)=='$')methods(pos,inside,result);return;
             }
             for(String keyword:List.of("SELECT","FROM","WHERE","AND","OR","JOIN","LEFT JOIN","ON","GROUP BY","ORDER BY","HAVING","LIMIT","INSERT INTO","VALUES","UPDATE","SET","DELETE FROM","IS NULL","IS NOT NULL","IN","EXISTS"))result.addElement(LookupElementBuilder.create(keyword).withTypeText("SQL"));
             XmlTag statement=MapperModel.statement(pos);
@@ -67,19 +75,24 @@ public final class MapperCompletion extends CompletionContributor {
     }
     private static void parameters(PsiElement pos,String before,CompletionResultSet result){
         XmlTag statement=MapperModel.statement(pos);PsiMethod method=statement==null?null:MapperModel.method(statement);
-        if(method==null && !MapperModel.isLegacy(MapperModel.root(pos)))return;ParameterModel model=ParameterModel.of(method,pos);
-        String path=before.replaceAll("(?s).*[^\\p{L}\\p{N}_.\\[\\]]","");int dot=path.lastIndexOf('.');String prefix=dot<0?path:path.substring(dot+1);
-        add(result.withPrefixMatcher(prefix),model.complete(path));
+        ParameterModel model=ParameterModel.of(method,pos);
+        String path=expression(before);int dot=path.lastIndexOf('.');String prefix=dot<0?path:path.substring(dot+1);
+        PsiType type=dot<0?null:OgnlTypes.type(path.substring(0,dot),model,pos);
+        add(result.withPrefixMatcher(prefix),dot<0?model.symbols():ParameterModel.properties(type));
+    }
+    private static String expression(String before){
+        int depth=0;char quote=0;
+        for(int i=before.length()-1;i>=0;i--){char c=before.charAt(i);if(quote!=0){if(c==quote && (i==0 || before.charAt(i-1)!='\\'))quote=0;continue;}if(c=='\'' || c=='"'){quote=c;continue;}if(c==')' || c==']')depth++;else if(c=='(' || c=='['){if(depth==0)return before.substring(i+1);depth--;}else if(depth==0 && (Character.isWhitespace(c) || "=!<>+?:,&|".indexOf(c)>=0))return before.substring(i+1);}
+        return before;
     }
     private static void add(CompletionResultSet result,Map<String,ParameterModel.Symbol> symbols){
         symbols.forEach((name,s)->result.addElement(LookupElementBuilder.create(name).withTypeText(s.type()==null?"动态变量":s.type().getPresentableText()).withIcon(com.intellij.icons.AllIcons.Nodes.Property)));
     }
     private static void methods(PsiElement pos,String before,CompletionResultSet result){
-        String path=before.replaceAll("(?s).*[^\\p{L}\\p{N}_.\\[\\]]","");int dot=path.lastIndexOf('.');if(dot<0)return;
-        XmlTag statement=MapperModel.statement(pos);if(statement==null)return;
-        var symbol=ParameterModel.of(null,pos).resolve(path.substring(0,dot));
-        if(symbol==null || !(symbol.type() instanceof PsiClassType type))return;PsiClass cls=type.resolve();if(cls==null)return;
+        String path=expression(before);int dot=path.lastIndexOf('.');if(dot<0)return;
+        PsiType owner=OgnlTypes.type(path.substring(0,dot),ParameterModel.of(null,pos),pos);
+        if(!(owner instanceof PsiClassType type))return;PsiClass cls=type.resolve();if(cls==null)return;
         CompletionResultSet target=result.withPrefixMatcher(path.substring(dot+1));Set<String> seen=new HashSet<>();
-        for(PsiMethod method:cls.getAllMethods())if(method.hasModifierProperty(PsiModifier.PUBLIC) && !method.hasModifierProperty(PsiModifier.STATIC) && method.getParameterList().getParametersCount()==0 && seen.add(method.getName()))target.addElement(LookupElementBuilder.create(method.getName()+"()").withTypeText(method.getReturnType()==null?"":method.getReturnType().getPresentableText()));
+        for(PsiMethod method:cls.getAllMethods())if(method.hasModifierProperty(PsiModifier.PUBLIC) && !method.hasModifierProperty(PsiModifier.STATIC) && seen.add(method.getName()))target.addElement(LookupElementBuilder.create(method.getName()+(method.getParameterList().getParametersCount()==0?"()":"(")).withPresentableText(method.getName()+"("+String.join(", ",Arrays.stream(method.getParameterList().getParameters()).map(p->p.getType().getPresentableText()).toList())+")").withTypeText(method.getReturnType()==null?"":method.getReturnType().getPresentableText()));
     }
 }

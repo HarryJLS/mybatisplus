@@ -9,17 +9,21 @@ import java.util.*;
 import java.util.regex.*;
 import org.jetbrains.annotations.NotNull;
 
-/** Optional IDEA Database integration. Only static SQL with bound placeholders is injected. */
+/** Optional SQL language integration; dynamic XML hosts keep their representative branch context. */
 public final class SqlLanguageInjector implements MultiHostInjector {
+    static final com.intellij.openapi.util.Key<Boolean> XML_SQL=com.intellij.openapi.util.Key.create("mybatis.assistant.xml.sql.injection");
     public record Place(TextRange range,String prefix) {}
     @Override public void getLanguagesToInject(@NotNull MultiHostRegistrar registrar,@NotNull PsiElement element){
-        Language sql=Language.findLanguageByID("SQL");if(sql==null)return;
+        Language sql=Language.findLanguageByID("SQL");if(sql==null || com.intellij.openapi.project.DumbService.isDumb(element.getProject()))return;
+        if(element instanceof XmlText text){
+            if(!(text instanceof PsiLanguageInjectionHost host))return;
+            var places=DynamicSqlEditing.places(text);if(places.isEmpty())return;registrar.startInjecting(sql).putInjectedFileUserData(XML_SQL,true).frankensteinInjection(true);
+            for(var place:places)registrar.addPlace(place.prefix(),place.suffix(),host,place.range());registrar.doneInjecting();
+            return;
+        }
         List<PsiLanguageInjectionHost> hosts=new ArrayList<>();
-        if(element instanceof XmlTag tag){
-            if(!MapperModel.isStatement(tag) || MapperModel.isLegacy(MapperModel.root(tag)) || tag.getSubTags().length>0)return;
-            for(PsiElement child:tag.getChildren())if(child instanceof XmlText && child instanceof PsiLanguageInjectionHost host)hosts.add(host);
-        }else if(element instanceof PsiLiteralExpression literal && literal instanceof PsiLanguageInjectionHost host){
-            String text=AnnotationSql.text(literal);if(AnnotationSql.method(literal)==null || text==null || text.contains("<script>"))return;hosts.add(host);
+        if(element instanceof PsiLiteralExpression literal && literal instanceof PsiLanguageInjectionHost literalHost){
+            String text=AnnotationSql.text(literal);if(AnnotationSql.method(literal)==null || text==null || text.contains("<script>"))return;hosts.add(literalHost);
             PsiAnnotationMemberValue value=AnnotationSql.annotation(literal).findAttributeValue("value");
             if(value!=literal && !(value instanceof PsiArrayInitializerMemberValue array && array.getInitializers().length==1 && array.getInitializers()[0]==literal))return;
         }else return;
@@ -30,7 +34,7 @@ public final class SqlLanguageInjector implements MultiHostInjector {
         places.forEach((host,ranges)->ranges.forEach(p->registrar.addPlace(p.prefix(),null,host,p.range())));
         registrar.doneInjecting();
     }
-    @Override public @NotNull List<? extends Class<? extends PsiElement>> elementsToInjectIn(){return List.of(XmlTag.class,PsiLiteralExpression.class);}
+    @Override public @NotNull List<? extends Class<? extends PsiElement>> elementsToInjectIn(){return List.of(XmlText.class,PsiLiteralExpression.class);}
     public static List<Place> places(PsiLanguageInjectionHost host){
         TextRange content=ElementManipulators.getValueTextRange(host);var escaper=host.createLiteralTextEscaper();StringBuilder decoded=new StringBuilder();
         if(!escaper.decode(content,decoded) || decoded.length()>262144 || decoded.indexOf("${")>=0)return List.of();

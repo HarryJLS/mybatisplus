@@ -1,6 +1,30 @@
-# 数据库、MCP、Kotlin 与 Spring（0.5.6）
+# SQL 编辑、测试、数据库与可选接入（0.5.8）
 
-发布时使用统一的 `mybatis-assistant-0.5.6.zip` 安装；当前 0.5.6 为未发布开发版本，本机测试包仅含 macOS aarch64 原生库。发布后的统一包供 Windows x86_64、macOS Apple Silicon / Intel 与 Linux x86_64 共用；原生引擎仍在首次使用时按当前系统加载。其他处理器/系统组合没有预编译库。数据库、MCP、Kotlin 和 Spring 的运行边界保持适用；0.5.5 新增 Mapper 文件/接口与跳转标记的原创鱼形图标，Kotlin 通过可选扩展加载。0.5.6 改为 XML 红色、接口蓝色的小鱼，跳转标记按目标类型配色，并过滤 XML 属性引号产生的重复项。
+发布时使用统一的 `mybatis-assistant-0.5.8.zip` 安装；当前 0.5.8 为未发布开发版本，本机测试包仅含 macOS aarch64 原生库。发布后的统一包供 Windows x86_64、macOS Apple Silicon / Intel 与 Linux x86_64 共用；原生引擎仍在首次使用时按当前系统加载。其他处理器/系统组合没有预编译库。数据库、MCP、Kotlin 和 Spring 的运行边界保持适用；0.5.5 新增 Mapper 文件/接口与跳转标记的原创鱼形图标，Kotlin 通过可选扩展加载。0.5.6 改为 XML 红色、接口蓝色的小鱼，跳转标记按目标类型配色，并过滤 XML 属性引号产生的重复项。
+
+## SQL 编辑与 resultMap
+
+XML 的 select/insert/update/delete、selectKey 和 sql 片段共享参数与 SQL 编辑支持。where/set/trim 使用前后缀规则，choose 对当前文本所在分支构造上下文，foreach 保留一轮循环体；include 按 namespace 索引解析，复用片段优先使用其引用语句的表上下文。SQL 提示与语法检查需要可选 IDEA Database；参数/OGNL/标签检查不需要 Database。条件不在编辑时求值，不穷举全部组合。动态 ${} 标识符、动态 refid 与无法有界展开的引用不注入猜测 SQL，保留参数提示与明确诊断。合成上下文不参与改写 XML 内容；XML 的标签、控制字符和参数绑定交由原 XML 格式化处理。
+
+点击 SELECT 开始行左侧绿色按钮 → 从 SELECT 生成 resultMap。实体来自 resultType、已有 resultMap 或 Mapper 返回类型；字段/getter、明确列注解和嵌套属性路径用于匹配。嵌套路径对应 association/collection，并在明确的别名前缀上生成 columnPrefix；未匹配列写入预览注释，用户可编辑映射后写入新 resultMap 并关联 SELECT。不覆盖原 resultMap。通配符、重复输出别名和动态投影无法确定完整输出列，拒绝自动生成；应先设置唯一的静态别名。
+
+反向 resultMap/sql 引用按 XML 文件变化持久索引，编辑不扫描全项目。展开深度最多 32、语句节点最多 2048、SQL 文本最多 256 Ki 字符；resultMap 引用最多 128 个文件/4096 个节点，实体匹配最多 512 个叶属性/6 层。超限保留不完整说明。
+
+## 接口方法测试与 testcase
+
+点击 Java/Kotlin Mapper 方法名左侧绿色按钮，或 SELECT 左侧绿色按钮菜单的“测试 Mapper SQL / 生成 testcase”。鱼形图标继续负责接口/XML 导航，Alt+Enter 仍可使用。输入模型提供可编辑 JSON 样例；测试按钮后台渲染当前参数分支，显示 SQL 和有序参数。生成需要唯一的 MyBatis XML 语句，预览成功后写入所属模块的 src/test/java 与 src/test/resources。参数或 XML 变化后必须重新测试，不覆盖任何已有测试文件。
+
+测试无需 Spring；自动检测 JUnit 5/4（未检测到时使用 JUnit 5，项目需提供 MyBatis 与 JUnit 测试依赖）。配置读取原 Mapper 的 classpath 资源及解析到的引用文件/类型别名，后续修改原 XML 后可直接再次运行测试。SQL 测试使用真实 MyBatis BoundSql，断言本次渲染的 SQL 和有序参数；这只是所选输入分支的断言。数据库测试默认跳过，显式设置以下 JVM 参数后才运行，并使用非自动提交 SqlSession，结束回滚：
+
+```text
+-Dmybatis.test.database=true
+-Dmybatis.test.jdbc.driver=org.example.YourDriver
+-Dmybatis.test.jdbc.url=your-test-jdbc-url
+-Dmybatis.test.jdbc.user=your-test-user
+-Dmybatis.test.jdbc.password=your-test-password
+```
+
+测试代码不保存凭证、不自动下载驱动、不初始化生产数据。数据库测试需要提供有效测试数据和业务结果断言；仅无异常或 affected >= 0 不代表业务通过。自定义插件、工厂、TypeHandler、事务外副作用和全部方言需在项目测试配置中另行验证；iBATIS/Provider/非唯一语句不生成 testcase。回滚仍受数据库事务能力约束。
 
 ## 数据库连接与执行
 

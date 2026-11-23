@@ -22,8 +22,8 @@ public final class ParameterModel {
     private final Map<String,Symbol> readOnlySymbols=Collections.unmodifiableMap(symbols);
     private boolean dynamic;
     private PsiType legacyParameterType;
+    private PsiType rootMapType;
     private static final Pattern SIMPLE=Pattern.compile("(java\\.lang\\.(String|Integer|Long|Short|Byte|Double|Float|Boolean|Character)|java\\.math\\..*|java\\.time\\..*|java\\.util\\.Date)");
-    private static final Pattern INDEX=Pattern.compile("\\[[^]]*]");
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> CONTEXT_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.context");
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> METHOD_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.method");
     private static final com.intellij.openapi.util.Key<CachedValue<ParameterModel>> LEGACY_CACHE=com.intellij.openapi.util.Key.create("mybatis.assistant.binding.ibatis");
@@ -46,7 +46,7 @@ public final class ParameterModel {
             PsiMethod method=MapperModel.method(statement);PsiElement declaration=statement;
             if(type==null && declared==null && method!=null && method.getParameterList().getParametersCount()==1){PsiParameter parameter=method.getParameterList().getParameters()[0];type=parameter.getType();declaration=parameter;}
             model.legacyParameterType=type;
-            if(type==null || isMap(type)){model.dynamic=true;}
+            if(type==null || isMap(type)){model.dynamic=true;model.rootMapType=type;}
             else if(simple(type)){model.dynamic=true;model.symbols.put("value",new Symbol(declaration,type));}
             else if(type instanceof PsiArrayType || InheritanceUtil.isInheritor(type,"java.lang.Iterable")){model.dynamic=true;}
             else model.symbols.putAll(properties(type));
@@ -63,9 +63,27 @@ public final class ParameterModel {
         // The provider may retain only its owning XML PSI; resolve the Java method when recomputing.
         return CachedValuesManager.getManager(context.getProject()).getCachedValue(context,CONTEXT_CACHE,()->{
             XmlTag statement=MapperModel.statement(context);
-            ParameterModel bindings=statement!=null && MapperModel.isLegacy(MapperModel.root(statement))?legacyBase(statement):statement==null?base(null):specializedBase(statement);
-            return CachedValueProvider.Result.create(scoped(bindings,context),context.getContainingFile(),PsiModificationTracker.MODIFICATION_COUNT,context.getProject().getService(AssistantSettings.class));
+            ParameterModel bindings=statement!=null && MapperModel.isLegacy(MapperModel.root(statement))?legacyBase(statement):statement==null?fragmentBase(context):specializedBase(statement);
+            return CachedValueProvider.Result.create(scoped(bindings,context),context.getContainingFile(),PsiModificationTracker.MODIFICATION_COUNT,context.getProject().getService(AssistantSettings.class),MapperUsageIndex.tracker(context.getProject()));
         },false);
+    }
+    private static ParameterModel fragmentBase(PsiElement context){
+        XmlTag fragment=PsiTreeUtil.getParentOfType(context,XmlTag.class,false);while(fragment!=null && !fragment.getName().equals("sql"))fragment=fragment.getParentTag();
+        if(fragment==null)return base(null);XmlTag root=MapperModel.root(fragment);if(root==null)return base(null);
+        ParameterModel result=new ParameterModel();int[] steps={0};boolean found=false;
+        Set<XmlTag> roots=new LinkedHashSet<>(List.of(root));String namespace=root.getAttributeValue("namespace");if(namespace!=null)roots.addAll(MapperUsageIndex.roots(fragment,"sql",namespace+"."+fragment.getAttributeValue("id")));
+        for(XmlTag candidate:roots)for(XmlTag statement:candidate.getSubTags())if(MapperModel.isStatement(statement) && uses(statement,fragment,new HashSet<>(),0,steps)){
+            found=true;ParameterModel model=specializedBase(statement);result.dynamic|=model.dynamic;
+            for(var entry:model.symbols.entrySet()){Symbol old=result.symbols.get(entry.getKey());result.symbols.put(entry.getKey(),old==null?entry.getValue():Objects.equals(old.type(),entry.getValue().type())?old:new Symbol(old.declaration(),null));}
+        }
+        result.dynamic|=!found;return result;
+    }
+    static boolean uses(XmlTag tag,XmlTag fragment,Set<XmlTag> seen,int depth,int[] steps){
+        if(depth>16 || ++steps[0]>2048 || !seen.add(tag))return false;
+        for(XmlTag child:tag.getSubTags()){
+            if(child.getName().equals("include")){XmlTag target=MapperModel.definition(child,child.getAttributeValue("refid"),"sql");if(target==fragment || target!=null && uses(target,fragment,seen,depth+1,steps))return true;}
+            else if(uses(child,fragment,seen,depth+1,steps))return true;
+        }return false;
     }
     private static ParameterModel build(PsiMethod method){
         return build(method,PsiSubstitutor.EMPTY);
@@ -86,7 +104,7 @@ public final class ParameterModel {
                 model.symbols.put("_parameter",s);
                 if(type instanceof PsiArrayType)model.symbols.put("array",s);
                 else if(InheritanceUtil.isInheritor(type,"java.util.Collection")){model.symbols.put("collection",s);if(InheritanceUtil.isInheritor(type,"java.util.List"))model.symbols.put("list",s);}
-                else if(simple(type) || isMap(type))model.dynamic=true;
+                else if(simple(type) || isMap(type)){model.dynamic=true;if(isMap(type))model.rootMapType=type;}
                 else {model.symbols.remove(p.getName());model.symbols.remove("arg"+i);model.symbols.putAll(properties(type));}
             }
         }
@@ -95,23 +113,48 @@ public final class ParameterModel {
     private static ParameterModel scoped(ParameterModel base,PsiElement context){
             List<XmlTag> ancestors=new ArrayList<>();XmlTag t=PsiTreeUtil.getParentOfType(context,XmlTag.class,false);
             while(t!=null){ancestors.add(t);t=t.getParentTag();}Collections.reverse(ancestors);
-            if(ancestors.stream().noneMatch(parent->"foreach".equals(parent.getName()) || "iterate".equals(parent.getName()) || parent.findSubTags("bind").length>0))return base;
-            ParameterModel model=new ParameterModel();model.symbols.putAll(base.symbols);model.dynamic=base.dynamic;model.legacyParameterType=base.legacyParameterType;
+            if(ancestors.stream().noneMatch(parent->!Set.of("mapper","sqlMap").contains(parent.getName()) && scopedNodes(parent,0,new int[]{0})))return base;
+            ParameterModel model=new ParameterModel();model.symbols.putAll(base.symbols);model.dynamic=base.dynamic;model.legacyParameterType=base.legacyParameterType;model.rootMapType=base.rootMapType;
             for(XmlTag parent:ancestors){
-                // Bind variables are statement-scoped; do not descend through arbitrary child tags.
-                for(XmlTag child:parent.findSubTags("bind")){String name=child.getAttributeValue("name");if(name!=null)model.symbols.put(name,new Symbol(child.getAttribute("name").getValueElement(),null));}
-                if("foreach".equals(parent.getName())){
+                if(Set.of("mapper","sqlMap").contains(parent.getName()))continue;
+                // A bind becomes visible after its declaration, and can refer to earlier binds.
+                for(XmlTag child:parent.getSubTags()){
+                    if(child.getTextRange().getEndOffset()>context.getTextRange().getStartOffset())break;
+                    earlierBinds(child,model,MapperModel.root(context),false,new HashSet<>(),0,new int[]{0});
+                }
+                if("foreach".equals(parent.getName()) && !(context instanceof com.intellij.psi.xml.XmlAttribute a && a.getParent()==parent) && !(context instanceof com.intellij.psi.xml.XmlAttributeValue a && a.getParent().getParent()==parent)){
                     Symbol collection=model.resolve(parent.getAttributeValue("collection"));
-                    PsiType type=collection==null?null:MapperModel.entityType(collection.type());
-                    if(collection!=null && isMap(collection.type()) && collection.type() instanceof PsiClassType map && map.getParameters().length==2)type=map.getParameters()[1];
+                    if(collection==null || Objects.requireNonNullElse(parent.getAttributeValue("collection"),"").contains("(")){PsiType inferred=OgnlTypes.type(parent.getAttributeValue("collection"),model,parent);collection=inferred==null?null:new Symbol(parent,inferred);}
+                    PsiType type=collection==null?null:elementType(collection.type());
                     model.symbols.put(Objects.requireNonNullElse(parent.getAttributeValue("item"),"item"),new Symbol(parent.getAttribute("item")==null?parent:parent.getAttribute("item").getValueElement(),type));
-                    model.symbols.put(Objects.requireNonNullElse(parent.getAttributeValue("index"),"index"),new Symbol(parent.getAttribute("index")==null?parent:parent.getAttribute("index").getValueElement(),PsiTypes.intType()));
+                    PsiType index=collection!=null && isMap(collection.type())?typeArgument(collection.type(),"java.util.Map",0):PsiTypes.intType();
+                    model.symbols.put(Objects.requireNonNullElse(parent.getAttributeValue("index"),"index"),new Symbol(parent.getAttribute("index")==null?parent:parent.getAttribute("index").getValueElement(),index));
                 }
                 if("iterate".equals(parent.getName()) && parent.getAttributeValue("property")==null){
                     model.symbols.put("[]",new Symbol(parent,MapperModel.entityType(base.legacyParameterType)));
                 }
             }
         return model;
+    }
+    private static boolean scopedNodes(XmlTag tag,int depth,int[] steps){
+        if(depth>16 || ++steps[0]>512)return true;
+        if(Set.of("foreach","iterate","bind","include").contains(tag.getName()))return true;
+        for(XmlTag child:tag.getSubTags())if(scopedNodes(child,depth+1,steps))return true;return false;
+    }
+    private static void earlierBinds(XmlTag tag,ParameterModel model,XmlTag callingRoot,boolean conditional,Set<XmlTag> stack,int depth,int[] steps){
+        if(depth>16 || ++steps[0]>512 || !stack.add(tag)){model.dynamic=true;return;}
+        try{
+            if(tag.getName().equals("bind")){
+                String name=tag.getAttributeValue("name");XmlAttribute attr=tag.getAttribute("name");
+                if(name!=null && attr.getValueElement()!=null)model.symbols.put(name,new Symbol(attr.getValueElement(),conditional?null:OgnlTypes.type(tag.getAttributeValue("value"),model,tag)));
+                return;
+            }
+            if(tag.getName().equals("include")){
+                XmlTag target=MapperModel.definition(callingRoot,tag.getAttributeValue("refid"),"sql");if(target!=null)earlierBinds(target,model,callingRoot,conditional,stack,depth+1,steps);return;
+            }
+            boolean uncertain=conditional || Set.of("if","choose","when","otherwise","foreach").contains(tag.getName());
+            for(XmlTag child:tag.getSubTags())earlierBinds(child,model,callingRoot,uncertain,stack,depth+1,steps);
+        }finally{stack.remove(tag);}
     }
     public static String paramName(PsiParameter p){
         PsiAnnotation a=p.getAnnotation("org.apache.ibatis.annotations.Param");if(a==null)return null;
@@ -121,14 +164,45 @@ public final class ParameterModel {
     public boolean dynamic(){return dynamic;}
     public Symbol resolve(String path){
         if(path==null)return null;
-        String[] parts=path.split("\\.");
-        Symbol s=symbols.get(parts[0].startsWith("[]")?"[]":INDEX.matcher(parts[0]).replaceAll(""));
-        if(s!=null && parts[0].contains("["))s=new Symbol(s.declaration(),MapperModel.entityType(s.type()));
-        for(int i=1;s!=null && i<parts.length;i++){
-            if(isMap(s.type()) || s.type()==null)return new Symbol(s.declaration(),null);
-            s=properties(s.type()).get(INDEX.matcher(parts[i]).replaceAll(""));
-            if(s!=null && parts[i].contains("["))s=new Symbol(s.declaration(),MapperModel.entityType(s.type()));
-        }return s;
+        if(path.startsWith("_parameter.") && !symbols.containsKey("_parameter"))path=path.substring(11);
+        List<String> parts=pathParts(path);if(parts.isEmpty())return null;
+        Symbol s=null;
+        for(int i=0;i<parts.size();i++){
+            String part=parts.get(i);int open=part.indexOf('[');String name=open<0?part:part.substring(0,open);
+            if(i==0){s=symbols.get(part.startsWith("[]")?"[]":name);if(s==null && rootMapType!=null)s=member(rootMapType,name);}
+            else if(s!=null){Symbol next=member(s.type(),name);s=next==null && s.type()==null?new Symbol(s.declaration(),null):next;}
+            if(s==null)return null;
+            if(!part.startsWith("[]"))for(int j=0;j<part.length();j++)if(part.charAt(j)=='['){int end=part.indexOf(']',j);if(end<0)return null;PsiType indexed=indexType(s.type());if(indexed==null && s.type()!=null && !isMap(s.type()))return null;s=new Symbol(s.declaration(),indexed);j=end;}
+        }
+        return s;
+    }
+    private static List<String> pathParts(String path){
+        if(path.length()>4096)return List.of();List<String> result=new ArrayList<>();int start=0,depth=0;char quote=0;
+        for(int i=0;i<path.length();i++){char c=path.charAt(i);if(quote!=0){if(c=='\\')i++;else if(c==quote)quote=0;}else if(c=='\'' || c=='"')quote=c;else if(c=='[')depth++;else if(c==']')depth--;else if(c=='.' && depth==0){result.add(path.substring(start,i));start=i+1;}}
+        result.add(path.substring(start));return result;
+    }
+    static Symbol member(PsiType type,String name){
+        if(name==null)return null;
+        Symbol known=properties(type).get(name);if(known!=null)return known;
+        if(isMap(type))return new Symbol(null,bound(typeArgument(type,"java.util.Map",1)));
+        return null;
+    }
+    static PsiType indexType(PsiType type){
+        if(isMap(type))return bound(typeArgument(type,"java.util.Map",1));
+        if(type instanceof PsiArrayType array)return bound(array.getComponentType());
+        if(type instanceof PsiClassType ct && ct.rawType().equalsToText("java.util.List") || type!=null && InheritanceUtil.isInheritor(type,"java.util.List"))return bound(typeArgument(type,"java.util.List",0));
+        return null;
+    }
+    static PsiType elementType(PsiType type){
+        if(type instanceof PsiArrayType array)return bound(array.getComponentType());
+        return isMap(type)?bound(typeArgument(type,"java.util.Map",1)):bound(typeArgument(type,"java.lang.Iterable",0));
+    }
+    private static PsiType bound(PsiType type){if(type instanceof PsiWildcardType wildcard)return wildcard.isExtends()?wildcard.getBound():null;if(type instanceof PsiCapturedWildcardType captured)return captured.getUpperBound();return type;}
+    static PsiType typeArgument(PsiType type,String base,int index){
+        if(!(type instanceof PsiClassType ct))return null;var resolved=ct.resolveGenerics();PsiClass cls=resolved.getElement();if(cls==null)return ct.getParameters().length>index?ct.getParameters()[index]:null;
+        PsiClass target=JavaPsiFacade.getInstance(cls.getProject()).findClass(base,cls.getResolveScope());if(target==null || target.getTypeParameters().length<=index)return null;
+        if(!target.isEquivalentTo(cls) && !InheritanceUtil.isInheritor(cls,base))return null;
+        return TypeConversionUtil.getSuperClassSubstitutor(target,cls,resolved.getSubstitutor()).substitute(target.getTypeParameters()[index]);
     }
     public Map<String,Symbol> complete(String path){
         int dot=path.lastIndexOf('.');if(dot<0)return symbols;
@@ -155,6 +229,10 @@ public final class ParameterModel {
         Map<String,Symbol> result=new LinkedHashMap<>();
         if(Set.of("java.util.List","java.util.Set","java.util.Collection").contains(Objects.requireNonNullElse(cls.getQualifiedName(),"")) || InheritanceUtil.isInheritor(cls,"java.util.Collection")){
             result.put("size",new Symbol(cls,PsiTypes.intType()));result.put("isEmpty",new Symbol(cls,PsiTypes.booleanType()));
+        }
+        if("java.util.Map".equals(cls.getQualifiedName()) || InheritanceUtil.isInheritor(cls,"java.util.Map")){
+            result.put("size",new Symbol(cls,PsiTypes.intType()));result.put("isEmpty",new Symbol(cls,PsiTypes.booleanType()));
+            for(String name:List.of("values","keySet"))for(PsiMethod method:cls.findMethodsByName(name,true))if(method.getParameterList().getParametersCount()==0){PsiSubstitutor sub=TypeConversionUtil.getSuperClassSubstitutor(method.getContainingClass(),cls,PsiSubstitutor.EMPTY);Symbol symbol=new Symbol(method,sub.substitute(method.getReturnType()));result.put(name,symbol);if(name.equals("keySet"))result.put("keys",symbol);break;}
         }
         for(PsiField f:cls.getAllFields())if(!f.hasModifierProperty(PsiModifier.STATIC)){
             ProgressManager.checkCanceled();

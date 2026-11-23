@@ -163,3 +163,7 @@ RSS 包含 IDEA、JVM、原生映射与其他已启用扩展；不能将其全�
 本次包含 0.5.3 的 20 分钟观察、0.5.4 的 5 分钟压力观察及 2 分钟 GC 后观察，属于有限窗口；没有完成数天真实使用、反复关闭/打开项目的堆保留对照或严格的启用/禁用 A/B 实验。生产数据库与不可离线求值的业务方法仍未验证。窗口控制不可用期间不声称已自动完成视觉点击检查；已完成 74 项 IDEA 集成测试、9 项可选扩展测试和上述真实进程后端调用验证。
 
 新增本机原始记录：`build/runtime-probe-0.5.4.json`、`build/runtime-native-0.5.4.json`、`build/ide-final-0.5.4.jfr`、`build/ide-final-0.5.4.json`、`build/ide-final-0.5.4.summary.json`、`build/ide-poststress-0.5.4.json`、`build/ide-poststress-0.5.4.summary.json`、`build/ide-final-histogram-0.5.4.txt`。
+
+## 0.5.7 SQL 编辑与映射索引
+
+新增 MapperUsageIndex 仅在 XML 文件变化时流式收集 resultMap/extends/refid 字符串键；补全、列检查和片段上下文按引用键定位文件，不扫描项目。动态 SQL 上下文缓存附着于当前 XmlText，返回内容只有字符串/区间，依赖实际读取文件及索引变化；每个文本位置只创建一个 SQL 注入文件，避免按每个绑定参数重复复制整条 SQL。展开、文件、属性和输出上限见运行文档。已有性能集成测试会在本版验证中运行；未将本次功能测试扩大宣称为长期压力或生产项目性能测量。

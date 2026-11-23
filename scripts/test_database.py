@@ -11,9 +11,10 @@ if (idea/'Contents').is_dir():idea=idea/'Contents'
 java=idea/'jbr/Contents/Home/bin'
 if not (java/'javac').exists():java=idea/'jbr/bin'
 classes=root/'build/database-test-classes';classes.mkdir(exist_ok=True)
-cp=os.pathsep.join(map(str,[classes,root/'build/classes']))
+cp=os.pathsep.join(map(str,[classes,root/'build/classes',root/'build/test-classes',*sorted((root/'build/plugin/mybatis-assistant/lib').glob('*.jar'))]))
 sources=sorted((root/'src/test/java/dev/mybatis/assistant/database').glob('*.java'))
 try:
  build.run([java/'javac','--release','21','-encoding','UTF-8','-cp',cp,'-d',classes,*sources])
  build.run([java/'java','-ea','-Dmybatis.test.h2='+str(jar),'-cp',cp,'dev.mybatis.assistant.database.JdbcExecutionTests'])
+ build.run([java/'java','-ea','-Dmybatis.test.h2='+str(jar),'-cp',cp,'dev.mybatis.assistant.core.GeneratedMapperTestTests'])
 except subprocess.CalledProcessError as error:sys.exit(error.returncode)

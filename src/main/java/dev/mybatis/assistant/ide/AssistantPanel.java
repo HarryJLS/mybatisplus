@@ -95,8 +95,8 @@ public final class AssistantPanel extends JPanel {
                     XmlTag root=MapperModel.root(file);
                     if(root==null){
                         PsiMethod method=MapperLanguageSupport.findMethod(file.findElementAt(Math.min(offset,Math.max(0,file.getTextLength()-1))));
-                        if(method==null || !MapperModel.annotated(method))throw new IllegalArgumentException("请打开 Mapper XML 或把光标放在 SQL 注解方法内");
-                        return new MapperSnapshot.Input(AnnotationSql.mapperXml(method),method.getName(),json,List.of());
+                        if(method==null)throw new IllegalArgumentException("请打开 Mapper XML 或把光标放在 Mapper 方法内");
+                        return MapperSnapshot.forMethod(method,json);
                     }
                     XmlTag statement=MapperModel.statement(file.findElementAt(Math.min(offset,Math.max(0,file.getTextLength()-1))));
                     String id=requestedId.isEmpty()?statement==null?null:statement.getAttributeValue("id"):requestedId;

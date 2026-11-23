@@ -53,7 +53,7 @@ public final class MapperReferences extends PsiReferenceContributor {
                 while(tokens.find()){String id=tokens.group();String kind=name.equals("parameterMap")?"parameterMap":"resultMap";TextRange r=new TextRange(range.getStartOffset()+tokens.start(),range.getStartOffset()+tokens.end());refs.add(new Ref(value,localRange(r,id),()->definitionId(MapperModel.definition(tag,id,kind)),false));}
             }
             case "property" -> {if(parameterProperty(tag))addPath(refs,value,range,text);else refs.add(new Ref(value,range,()->{
-                var symbol=ParameterModel.properties(MappingTypes.ownerType(tag)).get(text);return symbol==null?null:symbol.declaration();
+                var symbol=MappingTypes.property(MappingTypes.ownerType(tag),text);return symbol==null?null:symbol.declaration();
             },false));}
             case "compareProperty" -> addPath(refs,value,range,text);
             case "keyProperty" -> addPath(refs,value,range,text);

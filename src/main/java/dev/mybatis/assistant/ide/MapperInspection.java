@@ -14,6 +14,7 @@ public final class MapperInspection extends LocalInspectionTool {
         return new XmlElementVisitor(){
             @Override public void visitXmlTag(@NotNull XmlTag tag){
                 XmlTag root=MapperModel.root(tag);if(root==null)return;
+                MapperEditingChecks.tag(tag,holder);
                 String id=tag.getAttributeValue("id");
                 if(id!=null && tag.getParentTag()==root){
                     var peers=MapperModel.metadata(root).tags().getOrDefault(MapperModel.localId(root,id),List.of());
@@ -33,7 +34,7 @@ public final class MapperInspection extends LocalInspectionTool {
                     for(String name:List.of("test","collection","value")){
                         if(name.equals("value") && !tag.getName().equals("bind") || name.equals("collection") && !tag.getName().equals("foreach"))continue;
                         XmlAttribute expression=tag.getAttribute(name);if(expression!=null){
-                            if(model==null)model=ParameterModel.of(null,tag);
+                            model=ParameterModel.of(null,expression);
                             OgnlChecks.inspect(expression,model,holder);
                         }
                     }
@@ -48,19 +49,29 @@ public final class MapperInspection extends LocalInspectionTool {
                         return;
                     }
                     PsiType type=MappingTypes.ownerType(tag);
-                    if(type!=null && !ParameterModel.isMap(type) && !ParameterModel.properties(type).containsKey(property.getValue()))problem(holder,property,"实体中找不到属性: "+property.getValue());
+                    if(type!=null && !ParameterModel.isMap(type) && MappingTypes.property(type,property.getValue())==null)problem(holder,property,"实体中找不到属性: "+property.getValue());
                 }
             }
             @Override public void visitXmlText(@NotNull XmlText text){
-                XmlTag statement=MapperModel.statement(text);if(statement==null)return;
+                XmlTag statement=MapperModel.statement(text);if(statement==null && !MappingTypes.inSql(text))return;
                 ParameterModel model=null;String source=text.getText();
                 boolean legacy=MapperModel.isLegacy(MapperModel.root(text));int group=legacy?2:1;
                 Matcher matcher=(legacy?MapperReferences.LEGACY_PLACEHOLDER:MapperReferences.PLACEHOLDER).matcher(source);
+                if(!legacy){
+                    for(var issue:dev.mybatis.assistant.core.SqlParameters.inspect(source))holder.registerProblem(text,new com.intellij.openapi.util.TextRange(issue.start(),issue.end()),issue.message());
+                    for(var token:dev.mybatis.assistant.core.SqlParameters.tokens(source))if(token.dollar()){
+                        if(AssistantSettings.get(text.getProject()).warnDollar)holder.registerProblem(text,new com.intellij.openapi.util.TextRange(token.start(),token.end()),"${} 直接拼接 SQL，请确认输入来自可信白名单");
+                        try{
+                            var node=dev.mybatis.assistant.core.OgnlSyntax.parse(com.intellij.openapi.util.text.StringUtil.unescapeXmlEntities(token.expression()));
+                            OgnlTypes.infer(node,ParameterModel.of(null,text),text,message->holder.registerProblem(text,new com.intellij.openapi.util.TextRange(token.start(),token.end()),message),0);
+                        }catch(org.apache.ibatis.ognl.OgnlException e){holder.registerProblem(text,new com.intellij.openapi.util.TextRange(token.start(),token.end()),"${} OGNL 语法错误");}
+                    }
+                }
                 while(matcher.find()){
                     if(model==null)model=ParameterModel.of(null,text);
                     String path=matcher.group(group);
-                    if(model.resolve(path)==null && !model.dynamic() && !path.equals("_databaseId"))holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(group),matcher.end(group)),"找不到参数或属性: "+path);
-                    if(source.charAt(matcher.start())=='$' && AssistantSettings.get(text.getProject()).warnDollar)holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(),matcher.end()),(legacy?"$…$":"${}")+" 直接拼接 SQL，请确认输入来自可信白名单");
+                    if(source.charAt(matcher.start())!='$' && model.resolve(path)==null && !model.dynamic() && !path.equals("_databaseId"))holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(group),matcher.end(group)),"找不到参数或属性: "+path);
+                    if(legacy && source.charAt(matcher.start())=='$' && AssistantSettings.get(text.getProject()).warnDollar)holder.registerProblem(text,new com.intellij.openapi.util.TextRange(matcher.start(),matcher.end()),"$…$ 直接拼接 SQL，请确认输入来自可信白名单");
                 }
             }
         };
@@ -68,13 +79,28 @@ public final class MapperInspection extends LocalInspectionTool {
     private static boolean sameKind(XmlTag a,XmlTag b){return MapperModel.isStatement(a) && MapperModel.isStatement(b) || a.getName().equals(b.getName());}
     private static void problem(ProblemsHolder holder,XmlAttribute a,String message){if(a!=null && a.getValueElement()!=null)holder.registerProblem(a.getValueElement(),message,ProblemHighlightType.GENERIC_ERROR_OR_WARNING);}
     private static void checkColumns(XmlTag map,ProblemsHolder holder){
-        checkColumnFields(map,StatementSql.columns(map),holder,0);
+        var projection=StatementSql.columns(map);checkColumnFields(map,projection,holder,0);
+        if(projection.complete()){
+            Set<String> mapped=new HashSet<>();mappedColumns(map,"",mapped,new HashSet<>(),0);
+            List<String> missing=projection.columns().stream().filter(c->!mapped.contains(c.toLowerCase(Locale.ROOT))).toList();
+            if(!missing.isEmpty() && map.getAttribute("id")!=null)holder.registerProblem(map.getAttribute("id").getValueElement(),"SELECT 输出列未显式映射: "+String.join(", ",missing),ProblemHighlightType.WEAK_WARNING);
+        }
+    }
+    private static void mappedColumns(XmlTag node,String prefix,Set<String> columns,Set<XmlTag> stack,int depth){
+        if(depth>32 || !stack.add(node))return;
+        String inherited=node.getAttributeValue("extends");if(inherited!=null){XmlTag base=MapperModel.definition(node,inherited,"resultMap");if(base!=null)mappedColumns(base,prefix,columns,stack,depth+1);}
+        for(XmlTag child:node.getSubTags()){
+            String column=child.getAttributeValue("column");if(column!=null && !column.startsWith("{"))columns.add((prefix+column).toLowerCase(Locale.ROOT));
+            String nestedPrefix=prefix+Objects.requireNonNullElse(child.getAttributeValue("columnPrefix"),"");
+            String ref=child.getAttributeValue("resultMap");XmlTag target=ref==null?null:MapperModel.definition(child,ref,"resultMap");if(target!=null)mappedColumns(target,nestedPrefix,columns,stack,depth+1);
+            mappedColumns(child,nestedPrefix,columns,stack,depth+1);
+        }stack.remove(node);
     }
     private static void checkColumnFields(XmlTag node,dev.mybatis.assistant.core.SqlProjection.Result projection,ProblemsHolder holder,int depth){
         if(depth>32)return;Set<String> seen=new HashSet<>();
         for(XmlTag field:node.getSubTags()){
             if(Set.of("association","collection","constructor").contains(field.getName())){checkColumnFields(field,projection,holder,depth+1);continue;}
-            String column=field.getAttributeValue("column");if(column==null || !Set.of("id","result").contains(field.getName()))continue;
+            String column=field.getAttributeValue("column");if(column==null || !Set.of("id","result","arg","idArg","discriminator").contains(field.getName()))continue;
             if(!seen.add(column.toLowerCase(Locale.ROOT)))problem(holder,field.getAttribute("column"),"resultMap 重复列: "+column);
             String output=StatementSql.columnPrefix(field)+column;
             if(projection.complete() && projection.columns().stream().noneMatch(c->c.equalsIgnoreCase(output)))problem(holder,field.getAttribute("column"),"SELECT 输出中找不到 resultMap 列: "+output);

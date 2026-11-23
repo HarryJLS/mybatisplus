@@ -6,7 +6,8 @@ import java.util.*;
 public final class SqlProjection {
     private SqlProjection() {}
     public record Result(List<String> columns, boolean complete, String reason) {}
-    private record Token(String text, boolean identifier) {
+    private record Token(String text, boolean identifier,boolean quoted) {
+        Token(String text,boolean identifier){this(text,identifier,false);}
         boolean is(String word) { return text.equalsIgnoreCase(word); }
     }
 
@@ -25,7 +26,7 @@ public final class SqlProjection {
         if (select < 0) return new Result(List.of(), false, "不是可解析的 SELECT");
         if (from < 0) from = tokens.size();
         List<String> names = new ArrayList<>();
-        boolean complete = tokens.subList(select+1,from).stream().noneMatch(t->t.is("?"));
+        boolean complete = tokens.subList(select+1,from).stream().noneMatch(t->t.is("?dynamic"));
         int begin = select + 1;
         if (begin < from && (tokens.get(begin).is("DISTINCT") || tokens.get(begin).is("ALL"))) begin++;
         depth = 0;
@@ -39,13 +40,14 @@ public final class SqlProjection {
                 if (tokens.get(i).is(")")) depth--;
             }
         }
-        return new Result(List.copyOf(names), complete && !names.isEmpty(), complete ? "" : "包含 *、动态列或没有别名的表达式");
+        return new Result(List.copyOf(names), complete && !names.isEmpty(), names.isEmpty()?"没有明确的 SELECT 输出列":complete ? "" : "包含 *、动态列或没有别名的表达式");
     }
 
     private static String outputName(List<Token> ts) {
         if (ts.isEmpty()) return null;
         int n = ts.size();
         Token last = ts.get(n - 1);
+        if(last.identifier && !last.quoted && Set.of("END","NULL","TRUE","FALSE").contains(last.text.toUpperCase(Locale.ROOT)))return null;
         if (last.identifier && n >= 3 && ts.get(n - 2).is("AS")) return last.text;
         boolean path = true;
         for (int i = 0; i < n; i++) {
@@ -55,7 +57,7 @@ public final class SqlProjection {
         if (last.identifier && n > 1) {
             Token before = ts.get(n - 2);
             // Bare aliases follow a complete expression, never an operator or a dotted name.
-            if (before.identifier || before.is(")") || before.text.startsWith("'")) return last.text;
+            if (before.identifier || before.is(")") || before.text.startsWith("'") || before.text.matches("[0-9]+(?:\\.[0-9]+)?") || before.is("?")) return last.text;
         }
         return null;
     }
@@ -85,14 +87,16 @@ public final class SqlProjection {
                     } else if (ch == '\\' && c == '\'' && i < sql.length()) { value.append(sql.charAt(i++)); }
                     else value.append(ch);
                 }
-                ts.add(new Token(c == '\'' ? sql.substring(start, i) : value.toString(), c != '\'' && closed));
+                ts.add(new Token(c == '\'' ? sql.substring(start, i) : value.toString(), c != '\'' && closed,c!='\''));
             } else if ((c == '#' || c == '$') && i + 1 < sql.length() && sql.charAt(i + 1) == '{') {
                 int end = sql.indexOf('}', i + 2);
-                ts.add(new Token("?", false)); i = end < 0 ? sql.length() : end + 1;
+                ts.add(new Token(c=='$'?"?dynamic":"?", false)); i = end < 0 ? sql.length() : end + 1;
             } else if (Character.isJavaIdentifierStart(c)) {
                 int start = i++;
                 while (i < sql.length() && Character.isJavaIdentifierPart(sql.charAt(i))) i++;
                 ts.add(new Token(sql.substring(start, i), true));
+            } else if(Character.isDigit(c)){
+                int start=i++;while(i<sql.length() && (Character.isDigit(sql.charAt(i)) || sql.charAt(i)=='.'))i++;ts.add(new Token(sql.substring(start,i),false));
             } else { ts.add(new Token(String.valueOf(c), false)); i++; }
         }
         return ts;
